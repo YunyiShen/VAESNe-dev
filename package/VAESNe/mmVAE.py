@@ -1,53 +1,18 @@
 # mixture of expert VAEs from https://github.com/iffsid/mmvae/ https://arxiv.org/abs/1911.03393
 from itertools import combinations
-
-import torch
 import torch.nn as nn
 import math
 import os
-import shutil
 import sys
 import time
 
 import torch
 import torch.distributions as dist
 import torch.nn.functional as F
-
-import torch
 from numpy import prod
+from util_layers import get_mean, log_mean_exp, kl_divergence
 
-
-def is_multidata(dataB):
-    return isinstance(dataB, list) or isinstance(dataB, tuple)
-
-
-def get_mean(d, K=100):
-    """
-    Extract the `mean` parameter for given distribution.
-    If attribute not available, estimate from samples.
-    """
-    try:
-        mean = d.mean
-    except NotImplementedError:
-        samples = d.rsample(torch.Size([K]))
-        mean = samples.mean(0)
-    return mean
-
-
-def log_mean_exp(value, dim=0, keepdim=False):
-    return torch.logsumexp(value, dim, keepdim=keepdim) - math.log(value.size(dim))
-
-
-def kl_divergence(d1, d2, K=100):
-    """Computes closed-form KL if available, else computes a MC estimate."""
-    if (type(d1), type(d2)) in torch.distributions.kl._KL_REGISTRY:
-        return torch.distributions.kl_divergence(d1, d2)
-    else:
-        samples = d1.rsample(torch.Size([K]))
-        return (d1.log_prob(samples) - d2.log_prob(samples)).mean(0)
-    
-
-
+### base class of mmVAE
 
 class MMVAE(nn.Module):
     def __init__(self, prior_dist, params, *vaes):

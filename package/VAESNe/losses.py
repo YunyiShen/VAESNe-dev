@@ -2,6 +2,7 @@ from torch import nn
 from torch.nn import functional as F
 import torch
 import numpy as np
+from .util_layers import kl_divergence, get_mean, log_mean_exp
 
 class VAEloss(nn.Module):
     def __init__(self, beta=1.0):
@@ -31,136 +32,67 @@ class VAEloss(nn.Module):
 mmvae loss
 Mixture of Experts for multimodal variational autoencoders
 """
-class mmVAEloss(nn.Module):
-    def __init__(self, beta=1.0, K = 2):
-        super(mmVAEloss, self).__init__()
-        self.beta = beta
-        self.K = K
 
-    def forward(self, x, x_rec, mus, vars, mask=None):
-        # Reconstruction loss
-        if mask is not None:
-            rec_loss = F.mse_loss(x_rec, x, reduction='none')
-            rec_loss = rec_loss * (1.-1.*mask) # this mask is for attention so true is missing data
-            rec_loss = rec_loss.sum() / (1.-1.*mask).sum()
-        else:
-            rec_loss = F.mse_loss(x_rec, x, reduction='mean')
-        
-        # flatten the latent variables
-        
-        mu = mu.reshape(mu.size(0), -1)
-        var = var.reshape(var.size(0), -1)
-        # KL divergence
-        kl_loss = -0.5 * torch.mean(1 + torch.log(var) - mu.pow(2) - var)
-        #breakpoint()
-        return rec_loss, self.beta * kl_loss
+def elbo(model, x, K=1):
+    """Computes E_{p(x)}[ELBO] """
+    qz_x, px_z, _ = model(*x, K)
+    lpx_z = px_z.log_prob(x[0]).view(*px_z.batch_shape[:2], -1) * model.llik_scaling # take data
+    kld = kl_divergence(qz_x, model.pz(*model.pz_params))
+    return (lpx_z.sum(-1) - kld.sum(-1)).mean(0).sum()
 
 
+def m_elbo(model, x, K=1):
+    """Computes importance-sampled m_elbo (in notes3) for multi-modal vae """
+    qz_xs, px_zs, zss = model(x)
+    lpx_zs, klds = [], []
+    for r, qz_x in enumerate(qz_xs):
+        kld = kl_divergence(qz_x, model.pz(*model.pz_params))
+        klds.append(kld.sum([-1,-2]))
+        for d in range(len(px_zs)):
+            lpx_z = px_zs[d][d].log_prob(x[d][0]).view(*px_zs[d][d].batch_shape[:2], -1)  # added x[d][0], assume that x take the form of [(flux, time, band, mask), (flux, wavelength, phase, mask)], sum over data dimensions, kept batch and sample size
+            lpx_z = (lpx_z * model.vaes[d].llik_scaling).sum(-1)
+            if d == r:
+                lwt = torch.tensor(0.0)
+            else:
+                zs = zss[d].detach()
+                lwt = (qz_x.log_prob(zs) - qz_xs[d].log_prob(zs).detach()).sum((-1. -2)) # sum over two latent dimensions
+            lpx_zs.append(lwt.exp() * lpx_z)
+    obj = (1 / len(model.vaes)) * (torch.stack(lpx_zs).sum(0) - torch.stack(klds).sum(0))
+    return obj.mean(0).sum()
 
 
-"""
----------------------------------------------------------------------
--- Author: Jhosimar George Arias Figueroa
----------------------------------------------------------------------
-
-Loss functions used for training GMVAE model
-
-"""
-
-class GMVAELossFunctions:
-    eps = 1e-8
-
-    def mean_squared_error(self, real, predictions):
-      """Mean Squared Error between the true and predicted outputs
-         loss = (1/n)*Σ(real - predicted)^2
-
-      Args:
-          real: (array) corresponding array containing the true labels
-          predictions: (array) corresponding array containing the predicted labels
- 
-      Returns:
-          output: (array/float) depending on average parameters the result will be the mean
-                                of all the sample losses or an array with the losses per sample
-      """
-      loss = (real - predictions).pow(2)
-      return loss.sum(-1).mean()
+def _m_iwae(model, x, K=1):
+    """IWAE estimate for log p_\theta(x) for multi-modal vae -- fully vectorised"""
+    qz_xs, px_zs, zss = model(x, K)
+    lws = []
+    for r, qz_x in enumerate(qz_xs):
+        lpz = model.pz(*model.pz_params).log_prob(zss[r]).sum([-1,-2]) # -1 -2 for two latent dimensions
+        lqz_x = log_mean_exp(torch.stack([qz_x.log_prob(zss[r]).sum([-1,-2]) for qz_x in qz_xs]))
+        lpx_z = [px_z.log_prob(x[d][0]).view(*px_z.batch_shape[:2], -1) # added x[d][0], assume that x take the form of [(flux, time, band, mask), (flux, wavelength, phase, mask)], , sum over data dimensions, kept batch and sample size
+                     .mul(model.vaes[d].llik_scaling).sum(-1)
+                 for d, px_z in enumerate(px_zs[r])]
+        lpx_z = torch.stack(lpx_z).sum(0) # sum over batch K
+        lw = lpz + lpx_z - lqz_x
+        lws.append(lw)
+    return torch.cat(lws)  # (n_modality * n_samples) x batch_size, batch_size
 
 
-    def reconstruction_loss(self, real, predicted, rec_type='mse', mask=None):
-      """Reconstruction loss between the true and predicted outputs
-         mse = (1/n)*Σ(real - predicted)^2
-         bce = (1/n) * -Σ(real*log(predicted) + (1 - real)*log(1 - predicted))
+def is_multidata(dataB):
+    return isinstance(dataB, list)
 
-      Args:
-          real: (array) corresponding array containing the true labels
-          predictions: (array) corresponding array containing the predicted labels
- 
-      Returns:
-          output: (array/float) depending on average parameters the result will be the mean
-                                of all the sample losses or an array with the losses per sample
-      """
-      if rec_type == 'mse':
-        loss = (real - predicted).pow(2)
-      elif rec_type == 'bce':
-        loss = F.binary_cross_entropy(predicted, real, reduction='none')
-      else:
-        raise "invalid loss function... try bce or mse..."
-      if mask is None:
-        return loss.sum(-1).mean()
-      else:
-        return (loss * (1 - mask)).sum(-1)/(1 - mask).sum(-1)
+def compute_microbatch_split(x, K):
+    """ Checks if batch needs to be broken down further to fit in memory. """
+    B = x[0][0].size(0) if is_multidata(x) else x[0].size(0)
+    S = sum([1.0 / (K * prod(_x[0].size()[1:])) for _x in x]) if is_multidata(x) \
+        else 1.0 / (K * prod(x[0].size()[1:]))
+    S = int(1e8 * S)  # float heuristic for 12Gb cuda memory
+    assert (S > 0), "Cannot fit individual data in memory, consider smaller K"
+    return min(B, S)
 
-
-    def log_normal(self, x, mu, var):
-      """Logarithm of normal distribution with mean=mu and variance=var
-         log(x|μ, σ^2) = loss = -0.5 * Σ log(2π) + log(σ^2) + ((x - μ)/σ)^2
-
-      Args:
-         x: (array) corresponding array containing the input
-         mu: (array) corresponding array containing the mean 
-         var: (array) corresponding array containing the variance
-
-      Returns:
-         output: (array/float) depending on average parameters the result will be the mean
-                                of all the sample losses or an array with the losses per sample
-      """
-      if self.eps > 0.0:
-        var = var + self.eps
-      return -0.5 * torch.sum(
-        np.log(2.0 * np.pi) + torch.log(var) + torch.pow(x - mu, 2) / var, dim=-1)
-
-
-    def gaussian_loss(self, z, z_mu, z_var, z_mu_prior, z_var_prior):
-      """Variational loss when using labeled data without considering reconstruction loss
-         loss = log q(z|x,y) - log p(z) - log p(y)
-
-      Args:
-         z: (array) array containing the gaussian latent variable
-         z_mu: (array) array containing the mean of the inference model
-         z_var: (array) array containing the variance of the inference model
-         z_mu_prior: (array) array containing the prior mean of the generative model
-         z_var_prior: (array) array containing the prior variance of the generative mode
-         
-      Returns:
-         output: (array/float) depending on average parameters the result will be the mean
-                                of all the sample losses or an array with the losses per sample
-      """
-      loss = self.log_normal(z, z_mu, z_var) - self.log_normal(z, z_mu_prior, z_var_prior)
-      return loss.mean()
-
-
-    def entropy(self, logits, targets):
-      """Entropy loss
-          loss = (1/n) * -Σ targets*log(predicted)
-
-      Args:
-          logits: (array) corresponding array containing the logits of the categorical variable
-          real: (array) corresponding array containing the true labels
- 
-      Returns:
-          output: (array/float) depending on average parameters the result will be the mean
-                                of all the sample losses or an array with the losses per sample
-      """
-      log_q = F.log_softmax(logits, dim=-1)
-      return -torch.mean(torch.sum(targets * log_q, dim=-1))
-
+def m_iwae(model, x, K=1):
+    """Computes iwae estimate for log p_\theta(x) for multi-modal vae """
+    S = compute_microbatch_split(x, K)
+    x_split = zip(*[(_x.split(S) for _x in __x) for __x in x]) # LC and spectra all saved in tuples
+    lw = [_m_iwae(model, _x, K) for _x in x_split]
+    lw = torch.cat(lw, 1)  # concat on batch
+    return log_mean_exp(lw).sum()

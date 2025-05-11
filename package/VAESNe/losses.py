@@ -35,7 +35,7 @@ Mixture of Experts for multimodal variational autoencoders
 
 def elbo(model, x, K=1):
     """Computes E_{p(x)}[ELBO] """
-    qz_x, px_z, _ = model(*x, K)
+    qz_x, px_z, _ = model(x, K)
     lpx_z = px_z.log_prob(x[0]).view(*px_z.batch_shape[:2], -1) * model.llik_scaling # take data
     kld = kl_divergence(qz_x, model.pz(*model.pz_params))
     return (lpx_z.sum(-1) - kld.sum(-1)).mean(0).sum()

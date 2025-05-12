@@ -4,6 +4,7 @@ from torch.nn import functional as F
 from .PhotometricLayers import photometricTransformerEncoder, photometricTransformerDecoder
 from .base_vae import VAE
 import torch.distributions as dist
+from torch import nn
 
 class PhotometricEnc(nn.Module):
     def __init__(self, 
@@ -80,7 +81,7 @@ class PhotometricDec(nn.Module):
         x_rec = self.pxz(time, band, z, mask)
         var = torch.ones_like(x_rec) 
         if mask is not None:
-            var += 1e10 * mask # if masked variance is large 
+            var += 1e8 * mask # if masked variance is large 
         return x_rec, var
 
 
@@ -136,9 +137,20 @@ class PhotometricVAE(VAE):
     def forward(self, x, K = 1):
         flux, time, band, mask = x
         self._qz_x_params = self.enc(flux, time, band, mask)
+        if torch.isnan(self._qz_x_params[0]).any() or torch.isnan(self._qz_x_params[1]).any():
+            breakpoint()
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample(torch.Size([K]))
-        px_z = self.px_z(*self.dec(time, band, zs, mask))
+        
+        px_z_loc, px_z_scale = self.dec(time.unsqueeze(0).expand(K, -1, -1).view(-1, time.shape[-1]), 
+                                        band.unsqueeze(0).expand(K, -1, -1).view(-1, band.shape[-1]), 
+                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
+        
+        px_z_loc = px_z_loc.view(K, -1, flux.shape[-1])
+        px_z_scale = px_z_scale.view(K, -1, flux.shape[-1])
+
+        px_z = self.px_z(px_z_loc, px_z_scale)
         return qz_x, px_z, zs
     
     
@@ -155,9 +167,11 @@ class PhotometricVAE(VAE):
     def generate(self, N, time, band, mask = None):
         self.eval()
         with torch.no_grad():
-            pz = self.pz(*self.pz_params)
-            zs = pz.rsample(torch.Size([N]))
-            px_z = self.px_z(*self.dec(time, band, zs, mask))
+            px_z_param = self.dec(time.unsqueeze(0).expand(K, -1, -1).view(-1, time.shape[-1]), 
+                                        band.unsqueeze(0).expand(K, -1, -1).view(-1, band.shape[-1]), 
+                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
+            px_z = self.px_z(px_z_param)
             data = px_z.mean
         return data
 

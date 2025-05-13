@@ -85,11 +85,14 @@ class SpectraVAE(VAE):
                 num_heads = 4, 
                 ff_dim = 32, 
                 num_layers = 4,
-                dropout = 0.1):
+                dropout = 0.1,
+                prior = dist.Laplace,
+                likelihood = dist.Laplace,
+                posterior = dist.Laplace):
         super(SpectraVAE, self).__init__(
-            dist.Laplace,  # prior
-            dist.Laplace,  # likelihood
-            dist.Laplace,
+            prior,  # prior
+            likelihood,  # likelihood
+            posterior,  # posterior
             SpectraEnc(latent_len,
                     latent_dim,
                     model_dim, 

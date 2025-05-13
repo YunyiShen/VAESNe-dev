@@ -94,11 +94,15 @@ class PhotometricVAE(VAE):
                 num_heads = 4, 
                 ff_dim = 64, 
                 num_layers = 4,
-                dropout = 0.1):
+                dropout = 0.1,
+                prior = dist.Laplace,
+                likelihood = dist.Laplace,
+                posterior = dist.Laplace
+                ):
         super(PhotometricVAE, self).__init__(
-            dist.Laplace,  # prior
-            dist.Laplace,  # likelihood
-            dist.Laplace,  # posterior
+            prior,  # prior
+            likelihood,  # likelihood
+            posterior,  # posterior
             PhotometricEnc(num_bands,
                 latent_len,
                 latent_dim,

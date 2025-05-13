@@ -9,7 +9,7 @@ import torch.distributions as dist
 
 class SpectraEnc(nn.Module):
     def __init__(self, 
-                 latent_length,
+                 latent_len,
                  latent_dim,
                  model_dim, 
                 num_heads, 
@@ -20,14 +20,14 @@ class SpectraEnc(nn.Module):
 
         # q(y|x) and q(z|y,x) before GumbelSoftmax and Gaussian
         self.inference_transformer = spectraTransformerEncoder(
-                2 * latent_length,
+                2 * latent_len,
                  latent_dim,
                  model_dim, 
                  num_heads, 
                  num_layers,
                  ff_dim, dropout)
         self.latent_dim = latent_dim
-        self.latent_length = latent_length
+        self.latent_len = latent_len
 
 
     def forward(self, flux, wavelength, phase, mask = None):
@@ -38,8 +38,8 @@ class SpectraEnc(nn.Module):
 
         
         # q(z|x,y)
-        mu = bottleneck[:,:self.latent_length,:]
-        var = F.softplus( bottleneck[:,self.latent_length:,:])
+        mu = bottleneck[:,:self.latent_len,:]
+        var = F.softplus( bottleneck[:,self.latent_len:,:])
         
         return mu, var
 
@@ -51,7 +51,7 @@ class SpectraDec(nn.Module):
                  ff_dim, 
                  num_layers,
                  dropout=0.1):
-        super(vanillaSpectraGenerativeNet, self).__init__()
+        super(SpectraDec, self).__init__()
 
         # p(x|z)
         self.generativetransformer = spectraTransformerDecoder(
@@ -79,7 +79,7 @@ class SpectraDec(nn.Module):
 
 class SpectraVAE(VAE):
     def __init__(self, spectra_length = 982,
-                latent_length = 4,
+                latent_len = 4,
                 latent_dim = 2,
                 model_dim = 32, 
                 num_heads = 4, 
@@ -90,7 +90,7 @@ class SpectraVAE(VAE):
             dist.Laplace,  # prior
             dist.Laplace,  # likelihood
             dist.Laplace,
-            SpectraEnc(latent_length,
+            SpectraEnc(latent_len,
                     latent_dim,
                     model_dim, 
                     num_heads, 
@@ -106,7 +106,7 @@ class SpectraVAE(VAE):
                     dropout),
             params = [
                     spectra_length,
-                    latent_length,
+                    latent_len,
                     latent_dim,
                     model_dim, 
                     num_heads, 
@@ -114,6 +114,10 @@ class SpectraVAE(VAE):
                     ff_dim, 
                     dropout]
         )
+        self._pz_params = nn.ParameterList([
+            nn.Parameter(torch.zeros(latent_len, latent_dim), requires_grad=False),  # mu
+            nn.Parameter(torch.ones(latent_len, latent_dim), requires_grad=False)  # logvar
+        ])
         self.llik_scaling = 1.
         self.modelName = 'spectrum'
     
@@ -122,7 +126,15 @@ class SpectraVAE(VAE):
         self._qz_x_params = self.enc(flux, wavelength, phase, mask)
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample(torch.Size([K]))
-        px_z = self.px_z(*self.dec(wavelength, phase, zs, mask))
+        #breakpoint()
+        px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).view(-1, wavelength.shape[-1]), 
+                                        phase.unsqueeze(0).expand(K, -1).view(-1), 
+                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
+        px_z_loc = px_z_loc.view(K, -1, flux.shape[-1])
+        px_z_scale = px_z_scale.view(K, -1, flux.shape[-1])
+        px_z = self.px_z(px_z_loc, px_z_scale)
+        #breakpoint()
         return qz_x, px_z, zs
     
     def reconstruct(self, x):
@@ -134,6 +146,13 @@ class SpectraVAE(VAE):
             px_z = self.px_z(*self.dec(wavelength, phase, zs, mask))
             recon = get_mean(px_z)
         return recon
+    
+    def encode(self, x):
+        flux, time, band, mask = x
+        self.eval()
+        with torch.no_grad():
+            qz_x = self.qz_x(*self.enc(flux, time, band, mask))
+        return qz_x.mean
     
     def generate(self, N, wavelength, phase, mask = None):
         self.eval()

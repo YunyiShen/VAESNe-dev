@@ -154,6 +154,14 @@ class PhotometricVAE(VAE):
         return qz_x, px_z, zs
     
     
+    def encode(self, x):
+        flux, time, band, mask = x
+        self.eval()
+        with torch.no_grad():
+            qz_x = self.qz_x(*self.enc(flux, time, band, mask))
+        return qz_x.mean
+
+
     def reconstruct(self, x):
         flux, time, band, mask = x
         self.eval()

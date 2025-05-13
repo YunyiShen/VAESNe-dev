@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 import torch
 from matplotlib.lines import Line2D
-from umap import UMAP
+#from umap import UMAP
 
 
 def custom_cmap(n):

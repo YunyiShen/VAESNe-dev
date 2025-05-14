@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from .util_layers import get_mean, kl_divergence
-from .vis import embed_umap, tensors_to_df
+#from .vis import embed_umap, tensors_to_df
 
 
 class VAE(nn.Module):
@@ -59,6 +59,7 @@ class VAE(nn.Module):
             recon = get_mean(px_z)
         return recon
 
+    '''
     def analyse(self, data, K):
         self.eval()
         with torch.no_grad():
@@ -76,3 +77,4 @@ class VAE(nn.Module):
         return embed_umap(torch.cat(zss, 0).cpu().numpy()), \
             torch.cat(zsl, 0).cpu().numpy(), \
             kls_df
+    '''

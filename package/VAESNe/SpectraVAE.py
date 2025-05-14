@@ -123,6 +123,9 @@ class SpectraVAE(VAE):
         ])
         self.llik_scaling = 1.
         self.modelName = 'spectrum'
+        self.spectra_length = spectra_length
+        self.latent_len = latent_len
+        self.latent_dim = latent_dim
     
     def forward(self, x, K = 1):
         flux, wavelength, phase, mask = x
@@ -130,6 +133,7 @@ class SpectraVAE(VAE):
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample(torch.Size([K]))
         #breakpoint()
+        '''
         px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).view(-1, wavelength.shape[-1]), 
                                         phase.unsqueeze(0).expand(K, -1).view(-1), 
                                         zs.view(-1, zs.shape[-2], zs.shape[-1]), 
@@ -137,6 +141,8 @@ class SpectraVAE(VAE):
         px_z_loc = px_z_loc.view(K, -1, flux.shape[-1])
         px_z_scale = px_z_scale.view(K, -1, flux.shape[-1])
         px_z = self.px_z(px_z_loc, px_z_scale)
+        '''
+        px_z = self.decode(zs, x)
         #breakpoint()
         return qz_x, px_z, zs
     
@@ -156,6 +162,18 @@ class SpectraVAE(VAE):
         with torch.no_grad():
             qz_x = self.qz_x(*self.enc(flux, time, band, mask))
         return qz_x.mean
+    
+    def decode(self, zs, x):
+        _, wavelength, phase, mask = x 
+        K = zs.shape[0]
+        px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).view(-1, wavelength.shape[-1]), 
+                                        phase.unsqueeze(0).expand(K, -1).view(-1), 
+                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
+        px_z_loc = px_z_loc.view(K, -1, self.spectra_length)
+        px_z_scale = px_z_scale.view(K, -1, self.spectra_length)
+
+        return self.px_z(px_z_loc, px_z_scale)
     
     def generate(self, N, wavelength, phase, mask = None):
         self.eval()

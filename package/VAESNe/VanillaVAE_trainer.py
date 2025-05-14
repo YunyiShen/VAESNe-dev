@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch import nn, optim
-from .losses import VAEloss, elbo
+from .losses import elbo
 #from .Metrics import *
 import matplotlib.pyplot as plt
 import math

@@ -136,6 +136,9 @@ class PhotometricVAE(VAE):
         ])
         self.llik_scaling = 1.
         self.modelName = 'light_curve'
+        self.photometric_length = photometric_length
+        self.latent_len = latent_len
+        self.latent_dim = latent_dim
         #self.dataSize = dataSize
     
     def forward(self, x, K = 1):
@@ -145,7 +148,7 @@ class PhotometricVAE(VAE):
             breakpoint()
         qz_x = self.qz_x(*self._qz_x_params)
         zs = qz_x.rsample(torch.Size([K]))
-        
+        '''
         px_z_loc, px_z_scale = self.dec(time.unsqueeze(0).expand(K, -1, -1).view(-1, time.shape[-1]), 
                                         band.unsqueeze(0).expand(K, -1, -1).view(-1, band.shape[-1]), 
                                         zs.view(-1, zs.shape[-2], zs.shape[-1]), 
@@ -155,6 +158,8 @@ class PhotometricVAE(VAE):
         px_z_scale = px_z_scale.view(K, -1, flux.shape[-1])
 
         px_z = self.px_z(px_z_loc, px_z_scale)
+        '''
+        px_z = self.decode(zs, x)
         return qz_x, px_z, zs
     
     
@@ -165,6 +170,18 @@ class PhotometricVAE(VAE):
             qz_x = self.qz_x(*self.enc(flux, time, band, mask))
         return qz_x.mean
 
+    def decode(self, zs, x):
+        _, time, band, mask = x
+        K = zs.shape[0]
+        px_z_loc, px_z_scale = self.dec(time.unsqueeze(0).expand(K, -1, -1).view(-1, time.shape[-1]), 
+                                        band.unsqueeze(0).expand(K, -1, -1).view(-1, band.shape[-1]), 
+                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
+        
+        px_z_loc = px_z_loc.view(K, -1, self.photometric_length)
+        px_z_scale = px_z_scale.view(K, -1, self.photometric_length)
+
+        return self.px_z(px_z_loc, px_z_scale)
 
     def reconstruct(self, x):
         flux, time, band, mask = x

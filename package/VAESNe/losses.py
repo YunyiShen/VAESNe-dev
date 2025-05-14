@@ -41,6 +41,7 @@ def m_elbo(model, x, K=1):
 
 def _m_iwae(model, x, K=1):
     """IWAE estimate for log p_\theta(x) for multi-modal vae -- fully vectorised"""
+    
     qz_xs, px_zs, zss = model(x, K)
     lws = []
     for r, qz_x in enumerate(qz_xs):
@@ -49,6 +50,7 @@ def _m_iwae(model, x, K=1):
         lpx_z = [px_z.log_prob(x[d][0]).view(*px_z.batch_shape[:2], -1) # added x[d][0], assume that x take the form of [(flux, time, band, mask), (flux, wavelength, phase, mask)], , sum over data dimensions, kept batch and sample size
                      .mul(model.vaes[d].llik_scaling).sum(-1)
                  for d, px_z in enumerate(px_zs[r])]
+        
         lpx_z = torch.stack(lpx_z).sum(0) # sum over batch K
         lw = lpz + lpx_z - lqz_x
         lws.append(lw)
@@ -61,16 +63,26 @@ def is_multidata(dataB):
 def compute_microbatch_split(x, K):
     """ Checks if batch needs to be broken down further to fit in memory. """
     B = x[0][0].size(0) if is_multidata(x) else x[0].size(0)
-    S = sum([1.0 / (K * prod(_x[0].size()[1:])) for _x in x]) if is_multidata(x) \
-        else 1.0 / (K * prod(x[0].size()[1:]))
+    S = sum([1.0 / (K * np.prod(_x[0].size()[1:])) for _x in x]) if is_multidata(x) \
+        else 1.0 / (K * np.prod(x[0].size()[1:]))
     S = int(1e8 * S)  # float heuristic for 12Gb cuda memory
     assert (S > 0), "Cannot fit individual data in memory, consider smaller K"
+    #breakpoint()
     return min(B, S)
 
 def m_iwae(model, x, K=1):
     """Computes iwae estimate for log p_\theta(x) for multi-modal vae """
     S = compute_microbatch_split(x, K)
-    x_split = zip(*[(_x.split(S) for _x in __x) for __x in x]) # LC and spectra all saved in tuples
-    lw = [_m_iwae(model, _x, K) for _x in x_split]
+    n_chunk = len(x[0][0].split(S)) # not the best way to do it
+    #x_split = zip(*[(_x.split(S) for _x in __x) for __x in x]) # LC and spectra all saved in tuples
+    #lw = [_m_iwae(model, _x, K) for _x in x_split]
+    lw = []
+    
+    for i in range(n_chunk):
+        #breakpoint()
+        split_i = tuple(tuple(tensor.split(S)[i]  for tensor in tensor_tuple) for tensor_tuple in x)
+        #breakpoint()
+        lw.append(_m_iwae(model, split_i, K))
+    
     lw = torch.cat(lw, 1)  # concat on batch
     return log_mean_exp(lw).sum()

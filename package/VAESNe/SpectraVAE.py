@@ -166,12 +166,12 @@ class SpectraVAE(VAE):
     def decode(self, zs, x):
         _, wavelength, phase, mask = x 
         K = zs.shape[0]
-        px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).view(-1, wavelength.shape[-1]), 
-                                        phase.unsqueeze(0).expand(K, -1).view(-1), 
-                                        zs.view(-1, zs.shape[-2], zs.shape[-1]), 
-                                        mask.unsqueeze(0).expand(K, -1, -1).view(-1, mask.shape[-1]))
-        px_z_loc = px_z_loc.view(K, -1, self.spectra_length)
-        px_z_scale = px_z_scale.view(K, -1, self.spectra_length)
+        px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).reshape(-1, wavelength.shape[-1]), 
+                                        phase.unsqueeze(0).expand(K, -1).reshape(-1), 
+                                        zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
+                                        mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
+        px_z_loc = px_z_loc.reshape(K, -1, self.spectra_length)
+        px_z_scale = px_z_scale.reshape(K, -1, self.spectra_length)
 
         return self.px_z(px_z_loc, px_z_scale)
     

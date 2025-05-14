@@ -14,8 +14,10 @@ def safelog10(x):
 
 
 
-def training_step2(network, optimizer, data_loader, 
-                  loss_fn = elbo, K=1,release_memory = False):
+def training_step(network, optimizer, data_loader, 
+                  loss_fn = elbo, K=1,
+                  multimodal = False,
+                  release_memory = False):
     """Train the model for one epoch
 
     Args:
@@ -31,13 +33,12 @@ def training_step2(network, optimizer, data_loader,
     total_loss = 0.
     num_batches = 0.
     device = next(network.parameters()).device
-    for (flux, time, band, mask) in data_loader: # flux, time, band, mask for photometry and flux, wavelength, phase, mask for spectra
+    for x in data_loader: # flux, time, band, mask for photometry and flux, wavelength, phase, mask for spectra
         optimizer.zero_grad()
-        flux = flux.to(device)
-        time = time.to(device)
-        band = band.to(device)
-        mask = mask.to(device)
-        x = (flux, time, band, mask)
+        if multimodal:
+            x = [tuple(_x.to(device) for _x in modality) for modality in x]
+        else:
+            x = tuple(_x.to(device) for _x in x)
         loss = -loss_fn(network, x)
 
         loss.backward()
@@ -45,7 +46,7 @@ def training_step2(network, optimizer, data_loader,
         total_loss += loss.detach().cpu().item()
         num_batches += 1.
         if release_memory:
-            del x, flux, mask,time, band
+            del x
             gc.collect()
             torch.cuda.empty_cache()
 

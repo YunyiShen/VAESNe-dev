@@ -91,6 +91,7 @@ class photospecMMVAE(nn.Module):
         # initialise cross-modal matrix
         px_zs = [[None for _ in range(len(self.vaes))] for _ in range(len(self.vaes))]
         for m, vae in enumerate(self.vaes):
+            #breakpoint()
             qz_x, px_z, zs = vae(x[m], K=K)
             qz_xs.append(qz_x)
             zss.append(zs)

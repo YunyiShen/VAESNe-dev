@@ -78,7 +78,8 @@ class photospecMMVAE(nn.Module):
         self._pz_params = self._pz_params = nn.ParameterList([
             nn.Parameter(torch.zeros(vaes[0].latent_len, vaes[0].latent_dim), requires_grad=False),  # mu
             nn.Parameter(torch.ones(vaes[0].latent_len, vaes[0].latent_dim), requires_grad=False)  # logvar
-        ])  # defined in subclass
+        ])
+        self.vaes[0].llik_scaling = prod(self.vaes[1].spectra_length) / prod(self.vaes[0].photometric_length)
 
     @property
     def pz_params(self):

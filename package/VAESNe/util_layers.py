@@ -3,6 +3,40 @@ from torch import nn
 from torch.nn import functional as F
 import math
 
+
+
+########### simple MLPs ###############
+class singlelayerMLP(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super(singlelayerMLP, self).__init__()
+        self.fc1 = nn.Linear(in_dim, in_dim)
+        self.fc2 = nn.Linear(in_dim, out_dim)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+    
+class MLP(nn.Module):
+    def __init__(self, in_dim, out_dim, hidden_dim = [64,64]):
+        super(MLP, self).__init__()
+        layers = []
+        for i in range(len(hidden_dim)):
+            if i == 0:
+                layers.append(nn.Linear(in_dim, hidden_dim[i]))
+            else:
+                layers.append(nn.Linear(hidden_dim[i-1], hidden_dim[i]))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim[-1], out_dim))
+        self.mlp = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.mlp(x)
+
+
+############ Transformer use ##################
+################# positional encoding ###################
+
 class learnable_fourier_encoding(nn.Module):
     def __init__(self, dim = 64):
         super(learnable_fourier_encoding, self).__init__()
@@ -50,33 +84,6 @@ class SinusoidalMLPPositionalEmbedding(nn.Module):
         encoding = self.fc2(encoding)
         return encoding
 
-class singlelayerMLP(nn.Module):
-    def __init__(self, in_dim, out_dim):
-        super(singlelayerMLP, self).__init__()
-        self.fc1 = nn.Linear(in_dim, in_dim)
-        self.fc2 = nn.Linear(in_dim, out_dim)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-    
-class MLP(nn.Module):
-    def __init__(self, in_dim, out_dim, hidden_dim = [64,64]):
-        super(MLP, self).__init__()
-        layers = []
-        for i in range(len(hidden_dim)):
-            if i == 0:
-                layers.append(nn.Linear(in_dim, hidden_dim[i]))
-            else:
-                layers.append(nn.Linear(hidden_dim[i-1], hidden_dim[i]))
-            layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_dim[-1], out_dim))
-        self.mlp = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        return self.mlp(x)
-
 
 class RelativePosition(nn.Module):
 
@@ -97,6 +104,8 @@ class RelativePosition(nn.Module):
         embeddings = self.embeddings_table[final_mat].to(self.embeddings_table.device)
 
         return embeddings
+
+######################### attention blocks ######################
 
 class MultiHeadAttentionLayer_relative(nn.Module):
     def __init__(self, hid_dim, n_heads, dropout, device):
@@ -176,7 +185,83 @@ class MultiHeadAttentionLayer_relative(nn.Module):
         
         return x
 
+class TransformerBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads, ff_dim, 
+                 dropout=0.1, 
+                 context_self_attn = False):
+        super(TransformerBlock, self).__init__()
+        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, 
+                                               dropout=dropout, batch_first=True)
+        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, 
+                                                dropout=dropout, batch_first=True)
+        if context_self_attn:
+            self.context_self_attn = nn.MultiheadAttention(embed_dim, num_heads, 
+                                                dropout=dropout, batch_first=True)
+            self.layernorm_context = nn.LayerNorm(embed_dim)
+        else:
+            self.context_self_attn = None
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.GELU(),
+            nn.Linear(ff_dim, embed_dim),
+        )
+        self.layernorm1 = nn.LayerNorm(embed_dim)
+        self.layernorm2 = nn.LayerNorm(embed_dim)
+        self.layernorm3 = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
 
+    def forward(self, x, context=None, mask=None, context_mask=None):
+        # we made x [batch, seq_len, embed_dim]
+
+
+        attn_output, _ = self.self_attn(x, x, x, 
+                                        key_padding_mask = mask)
+            # in decoder mask whereever not observed
+        x = self.layernorm1(x + self.dropout(attn_output))
+
+        # Cross-attention (if context is provided)
+        if context is not None:
+            if self.context_self_attn:
+                context_attn_output, _ = self.context_self_attn(context, context, context,
+                                                                key_padding_mask=context_mask)
+                context = self.layernorm_context(context + self.dropout(context_attn_output))
+            #breakpoint()
+            cross_attn_output, _ = self.cross_attn(x, context, context,
+                                                       key_padding_mask=context_mask)
+            x = self.layernorm2(x + self.dropout(cross_attn_output))
+
+        # Feedforward
+        ffn_output = self.ffn(x)
+        x = self.layernorm3(x + self.dropout(ffn_output))
+
+        return x
+
+
+############## vae use ###################
+def get_mean(d, K=100):
+    """
+    Extract the `mean` parameter for given distribution.
+    If attribute not available, estimate from samples.
+    """
+    try:
+        mean = d.mean
+    except NotImplementedError:
+        samples = d.rsample(torch.Size([K]))
+        mean = samples.mean(0)
+    return mean
+
+
+def log_mean_exp(value, dim=0, keepdim=False):
+    return torch.logsumexp(value, dim, keepdim=keepdim) - math.log(value.size(dim))
+
+
+def kl_divergence(d1, d2, K=100):
+    """Computes closed-form KL if available, else computes a MC estimate."""
+    if (type(d1), type(d2)) in torch.distributions.kl._KL_REGISTRY:
+        return torch.distributions.kl_divergence(d1, d2)
+    else:
+        samples = d1.rsample(torch.Size([K]))
+        return (d1.log_prob(samples) - d2.log_prob(samples)).mean(0)
 
 # Flatten layer
 class Flatten(nn.Module):
@@ -237,97 +322,14 @@ class GumbelSoftmax(nn.Module):
         y = self.gumbel_softmax(logits, temperature, hard)
         return logits, prob, y
 
-# Sample from a Gaussian distribution
-class Gaussian(nn.Module):
-    def __init__(self, in_dim, z_dim):
-        super(Gaussian, self).__init__()
-        self.mu = nn.Linear(in_dim, z_dim)
-        self.var = nn.Linear(in_dim, z_dim)
-
-    def reparameterize(self, mu, var):
-        std = torch.sqrt(var + 1e-10)
-        noise = torch.randn_like(std)
-        z = mu + noise * std
-        return z            
+########### image use ############
+class PatchEmbed(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_chans=3, dim=768):
+        super().__init__()
+        self.proj = nn.Conv2d(in_chans, dim, kernel_size=patch_size, stride=patch_size)
+        self.num_patches = (img_size // patch_size) ** 2
 
     def forward(self, x):
-        mu = self.mu(x)
-        var = F.softplus(self.var(x))
-        z = self.reparameterize(mu, var)
-        return mu, var, z 
-
-class TransformerBlock(nn.Module):
-    def __init__(self, embed_dim, num_heads, ff_dim, 
-                 dropout=0.1, 
-                 context_self_attn = False):
-        super(TransformerBlock, self).__init__()
-        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, 
-                                               dropout=dropout, batch_first=True)
-        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, 
-                                                dropout=dropout, batch_first=True)
-        if context_self_attn:
-            self.context_self_attn = nn.MultiheadAttention(embed_dim, num_heads, 
-                                                dropout=dropout, batch_first=True)
-            self.layernorm_context = nn.LayerNorm(embed_dim)
-        else:
-            self.context_self_attn = None
-        self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, ff_dim),
-            nn.GELU(),
-            nn.Linear(ff_dim, embed_dim),
-        )
-        self.layernorm1 = nn.LayerNorm(embed_dim)
-        self.layernorm2 = nn.LayerNorm(embed_dim)
-        self.layernorm3 = nn.LayerNorm(embed_dim)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, context=None, mask=None, context_mask=None):
-        # we made x [batch, seq_len, embed_dim]
-
-
-        attn_output, _ = self.self_attn(x, x, x, 
-                                        key_padding_mask = mask)
-            # in decoder mask whereever not observed
-        x = self.layernorm1(x + self.dropout(attn_output))
-
-        # Cross-attention (if context is provided)
-        if context is not None:
-            if self.context_self_attn:
-                context_attn_output, _ = self.context_self_attn(context, context, context,
-                                                                key_padding_mask=context_mask)
-                context = self.layernorm_context(context + self.dropout(context_attn_output))
-            #breakpoint()
-            cross_attn_output, _ = self.cross_attn(x, context, context,
-                                                       key_padding_mask=context_mask)
-            x = self.layernorm2(x + self.dropout(cross_attn_output))
-
-        # Feedforward
-        ffn_output = self.ffn(x)
-        x = self.layernorm3(x + self.dropout(ffn_output))
-
+        x = self.proj(x)  # (B, dim, H/patch, W/patch)
+        x = x.flatten(2).transpose(1, 2)  # (B, N, dim)
         return x
-
-def get_mean(d, K=100):
-    """
-    Extract the `mean` parameter for given distribution.
-    If attribute not available, estimate from samples.
-    """
-    try:
-        mean = d.mean
-    except NotImplementedError:
-        samples = d.rsample(torch.Size([K]))
-        mean = samples.mean(0)
-    return mean
-
-
-def log_mean_exp(value, dim=0, keepdim=False):
-    return torch.logsumexp(value, dim, keepdim=keepdim) - math.log(value.size(dim))
-
-
-def kl_divergence(d1, d2, K=100):
-    """Computes closed-form KL if available, else computes a MC estimate."""
-    if (type(d1), type(d2)) in torch.distributions.kl._KL_REGISTRY:
-        return torch.distributions.kl_divergence(d1, d2)
-    else:
-        samples = d1.rsample(torch.Size([K]))
-        return (d1.log_prob(samples) - d2.log_prob(samples)).mean(0)

@@ -131,3 +131,5 @@ ckpt/*
 *.sh.log*
 *.png
 tests/
+
+cannon/logs

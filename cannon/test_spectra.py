@@ -4,13 +4,14 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import numpy as np
 # optimizer
-from torch.optim import Adam
+from torch.optim import AdamW
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+from matplotlib import pyplot as plt
 
 
-from VAESNe.SpectraNetworks import vanillaSpectraVAENet
-from VAESNe.VanillaVAE_trainer import train
-from VAESNe.losses import VAEloss
+from VAESNe.SpectraVAE import SpectraVAE
+from VAESNe.training_util import training_step
+from VAESNe.losses import elbo
 
 torch.manual_seed(0)
 
@@ -41,7 +42,7 @@ phase_test = torch.tensor(phase_test, dtype=torch.float32)
 flux = flux + 0.02 * torch.randn_like(flux)
 #wavelength = wavelength + 0.1 * torch.randn(wavelength.shape[0])[:,None] # shift all time in a single light curve by the same amount
 # randomly set some masks to be True
-mask = torch.logical_or(mask, torch.rand_like(flux) < 0.025)
+mask = torch.logical_or(mask, torch.rand_like(flux) < 0.05)
 #breakpoint()
 
 # split loaded data into training and validation
@@ -56,14 +57,12 @@ val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True, pin_memory=Tru
 lr = 1e-4
 epochs = 300
 
-loss_fn = VAEloss(beta = 1.).to(device)
-#breakpoint()
-my_vaesne = vanillaSpectraVAENet(
+my_vaesne = SpectraVAE(
     # data parameters
     spectra_length = 982,
 
     # model parameters
-    latent_length = 4,
+    latent_len = 4,
     latent_dim = 2,
     model_dim = 32, 
     num_heads = 4, 
@@ -71,15 +70,22 @@ my_vaesne = vanillaSpectraVAENet(
     num_layers = 4,
     dropout = 0.1).to(device)
 
-losses = train(my_vaesne,
-               train_loader, 
-               val_loader,
-              lr,
-              epochs,
-             loss_fn = loss_fn, 
-             device = device,
-             release_memory = False
-             )
+optimizer = AdamW(my_vaesne.parameters(), lr=lr)
+all_losses = np.ones(epochs) + np.nan
+steps = np.arange(epochs)
 
-torch.save(my_vaesne, '../ckpt/first_spectra_vaesne.pth')
+
+from tqdm import tqdm
+progress_bar = tqdm(range(epochs))
+for i in progress_bar:
+    loss = training_step(my_vaesne, optimizer, train_loader, elbo)
+    all_losses[i] = loss
+    if (i + 1) % 5 == 0:
+        plt.plot(steps, all_losses)
+        plt.show()
+        plt.savefig("./logs/training_spec.png")
+        plt.close()
+        torch.save(my_vaesne, '../ckpt/first_specvaesne_4-2.pth')
+    progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
+
 

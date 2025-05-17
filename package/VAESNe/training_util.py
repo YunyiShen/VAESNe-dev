@@ -50,4 +50,4 @@ def training_step(network, optimizer, data_loader,
             gc.collect()
             torch.cuda.empty_cache()
 
-    return [total_loss / num_batches]
+    return total_loss / num_batches

@@ -75,7 +75,7 @@ class photospecMMVAE(nn.Module):
         self.vaes = nn.ModuleList(vaes)
         self.modelName = "photospectra"
         #self.params = params
-        self._pz_params = self._pz_params = nn.ParameterList([
+        self._pz_params = nn.ParameterList([
             nn.Parameter(torch.zeros(vaes[0].latent_len, vaes[0].latent_dim), requires_grad=False),  # mu
             nn.Parameter(torch.ones(vaes[0].latent_len, vaes[0].latent_dim), requires_grad=False)  # logvar
         ])

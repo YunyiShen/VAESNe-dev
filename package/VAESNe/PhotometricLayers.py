@@ -1,8 +1,3 @@
-"""
----------------------------------------------------------------------
--- some useful layers by Jhosimar George Arias Figueroa
----------------------------------------------------------------------
-"""
 import torch
 from torch import nn
 from torch.nn import functional as F

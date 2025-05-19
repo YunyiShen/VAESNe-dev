@@ -31,7 +31,7 @@ class photometricTransformerDecoder(nn.Module):
                                                     for _ in range(num_layers)] 
                                                 )
         self.model_dim = model_dim
-        self.solid_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+        self.sinusoidal_time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
         self.bandembd = nn.Embedding(num_bands, model_dim)
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim]) # expand bottleneck to flux and time
         self.get_photo = singlelayerMLP(model_dim, 1)
@@ -46,7 +46,7 @@ class photometricTransformerDecoder(nn.Module):
         '''
         if self.donotmask:
             mask = None
-        time_embd = self.solid_embd(time)
+        time_embd = self.sinusoidal_time_embd(time)
         band_embd = self.bandembd(band)
         x = self.init_flux_embd[None, :, :] + time_embd + band_embd
         h = x

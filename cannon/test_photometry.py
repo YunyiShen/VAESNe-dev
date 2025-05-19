@@ -16,7 +16,7 @@ from VAESNe.losses import elbo
 
 
 
-data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_trunc15_phase.npz')
+data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
 photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
@@ -55,7 +55,7 @@ val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 lr = 2.5e-4
 epochs = 500
 my_vaesne = PhotometricVAE(
-    photometric_length = 90,
+    photometric_length = 60,
     num_bands = 6,
     # model parameters
     latent_len = 4,

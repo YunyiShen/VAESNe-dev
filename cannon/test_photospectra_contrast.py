@@ -9,12 +9,11 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 from matplotlib import pyplot as plt
 
 
-from VAESNe.SpectraVAE import SpectraVAE
-from VAESNe.PhotometricVAE import PhotometricVAE
+
 from VAESNe.training_util import training_step
-from VAESNe.losses import elbo, m_iwae, _m_iwae
+from VAESNe.losses import negInfoNCE
 from VAESNe.data_util import multimodalDataset
-from VAESNe.mmVAE import photospecMMVAE
+from VAESNe.contrastiveNets import ContraPhotSpec
 
 torch.manual_seed(0)
 
@@ -93,42 +92,37 @@ train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 lr = 2.5e-4
 epochs = 300
 
-my_spectravae = SpectraVAE(
-    # data parameters
-    spectra_length = 982,
 
-    # model parameters
-    latent_len = 4,
-    latent_dim = 2,
-    model_dim = 32, 
-    num_heads = 4, 
-    ff_dim = 32, 
-    num_layers = 4,
-    dropout = 0.1).to(device)
+contrastnet = ContraPhotSpec(
+    # latent things
+        latent_len = 4,
+        latent_dim = 2,
+        proj_dim = 8,
+        # photometric things
+        num_bands = 6,
+        photo_model_dim = 32,
+        photo_num_heads = 4, 
+        photo_ff_dim = 32, 
+        photo_num_layers = 4,
+        photo_dropout = 0.1,
 
-my_photovae = PhotometricVAE(
-    photometric_length = 60,
-    num_bands = 6,
-    # model parameters
-    latent_len = 4,
-    latent_dim = 2,
-    model_dim = 32, 
-    num_heads = 4, 
-    ff_dim = 32, 
-    num_layers = 4,
-    dropout = 0.1).to(device)
+        # spectra things
+        spec_model_dim = 32, 
+        spec_num_heads = 4, 
+        spec_num_layers = 4,
+        spec_ff_dim = 32, 
+        spec_dropout = 0.1
+).to(device)
 
-my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae]).to(device)
-
-optimizer = AdamW(my_mmvae.parameters(), lr=lr)
+optimizer = AdamW(contrastnet.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan
 steps = np.arange(epochs)
 
 from tqdm import tqdm
 progress_bar = tqdm(range(epochs))
 for i in progress_bar:
-    loss = training_step(my_mmvae, optimizer,train_loader, 
-                    loss_fn = lambda model, x: m_iwae(model, x, K=2), 
+    loss = training_step(contrastnet, optimizer,train_loader, 
+                    loss_fn = lambda model, x: negInfoNCE(model, x, temperature=0.1), 
                     multimodal = True)
     all_losses[i] = loss
     if (i + 1) % 5 == 0:
@@ -136,7 +130,13 @@ for i in progress_bar:
         plt.xlabel("training epochs")
         plt.ylabel("loss")
         plt.show()
-        plt.savefig("./logs/training_specphoto.png")
+        plt.savefig("./logs/training_specphotocontrast.png")
         plt.close()
-        torch.save(my_mmvae, f'../ckpt/first_photospectravaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(contrastnet, f'../ckpt/first_photospectra_contrast_4-2_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
+
+
+
+
+
+

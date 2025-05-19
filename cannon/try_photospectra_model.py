@@ -38,8 +38,18 @@ photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
-trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_500.pth",
+trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_500_K1.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
+
+photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
+                         map_location=torch.device('cpu'), weights_only = False)
+
+spectra_only = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
+                         map_location=torch.device('cpu'), weights_only = False)
+
+trained_vae.eval()
+photo_only.eval()
+spectra_only.eval()
 
 data = [
     ### photometry
@@ -55,10 +65,22 @@ data = [
 ]
 
 #breakpoint()
-reconstruction = trained_vae.reconstruct(data) # [0][0] LC->LC, [1][0]: spec->LC, [0][1]: LC-> Spec, [1][1]: spec-> spec
+with torch.no_grad():
+    reconstruction = trained_vae.reconstruct(data) # [0][0] LC->LC, [1][0]: spec->LC, [0][1]: LC-> Spec, [1][1]: spec-> spec
+
+    photo_only_recon = photo_only.reconstruct(data[0])
+    spectra_only_recon = spectra_only.reconstruct(data[1])
+
+    photo_encode = photo_only.encode(data[0])[None, ...]
+    spectra_encoded = spectra_only.encode(data[1])[None, ...]
+    photo_encode_spec_decode = spectra_only.decode(photo_encode, data[1]).mean
+    spec_encode_photo_decode = photo_only.decode(spectra_encoded, data[0]).mean
+
+
+
 
 import matplotlib.pyplot as plt
-fig, axs = plt.subplots(1, 3, figsize=(10, 5))
+fig, axs = plt.subplots(1, 5, figsize=(15, 5))
 
 for i in range(6):
     thisband_gt = photoflux_test[idx][torch.logical_and(
@@ -67,14 +89,30 @@ for i in range(6):
     thisband_time = phototime_test[idx][torch.logical_and(
         photoband_test[idx] == i,
         torch.logical_not(photomask_test[idx]))]
+
+    
     thisband_rec = reconstruction[0][0][0,0].detach()
     thisband_crossrec = reconstruction[1][0][0,0].detach()
-    
+    thisband_photoonly = photo_only_recon[0]
+    thisband_crossmodel = spec_encode_photo_decode[0,0]
+
+
+
     thisband_rec = thisband_rec[torch.logical_and(
         photoband_test[idx] == i,
         torch.logical_not(photomask_test[idx]))]
 
     thisband_crossrec = thisband_crossrec[torch.logical_and(
+        photoband_test[idx] == i,
+        torch.logical_not(photomask_test[idx]))]
+
+    
+    thisband_photoonly = thisband_photoonly[torch.logical_and(
+        photoband_test[idx] == i,
+        torch.logical_not(photomask_test[idx]))]
+
+    
+    thisband_crossmodel = thisband_crossmodel[torch.logical_and(
         photoband_test[idx] == i,
         torch.logical_not(photomask_test[idx]))]
 
@@ -88,16 +126,30 @@ for i in range(6):
     axs[2].plot(thisband_time, thisband_crossrec)
     axs[2].scatter(thisband_time, thisband_crossrec, s=20, marker='x')
 
+    axs[3].plot(thisband_time, thisband_photoonly)
+    axs[3].scatter(thisband_time, thisband_photoonly, s=20, marker='x')
+
+    axs[4].plot(thisband_time, thisband_crossmodel)
+    axs[4].scatter(thisband_time, thisband_crossmodel, s=20, marker='x')
+
 # invert y
 axs[0].set_ylim(-2, 6)
 axs[1].set_ylim(-2, 6)
 axs[2].set_ylim(-2, 6)
+axs[3].set_ylim(-2, 6)
+axs[4].set_ylim(-2, 6)
 axs[0].invert_yaxis()
 axs[0].set_title("Ground truth")
 axs[1].invert_yaxis()
 axs[1].set_title("Reconstruction-LC")
 axs[2].invert_yaxis()
 axs[2].set_title("Reconstruction-Spectra")
+
+axs[3].invert_yaxis()
+axs[3].set_title("photometry only model")
+
+axs[4].invert_yaxis()
+axs[4].set_title("cross model")
 
 
 #plt.tight_layout()
@@ -111,6 +163,9 @@ fig, axs = plt.subplots(1, 1, figsize=(10, 5))
 axs.plot(wavelength_test[idx], flux_test[idx], label='ground truth')
 axs.plot(wavelength_test[idx], reconstruction[1][1][0,0].detach().numpy(), label='Rec-spec')
 axs.plot(wavelength_test[idx], reconstruction[0][1][0,0].detach().numpy(), label='Rec-LC')
+
+axs.plot(wavelength_test[idx], spectra_only_recon[0].detach().numpy(), label='spec only')
+axs.plot(wavelength_test[idx], photo_encode_spec_decode[0,0].detach().numpy(), label='cross model')
 
 
 

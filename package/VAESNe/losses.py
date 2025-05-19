@@ -86,3 +86,22 @@ def m_iwae(model, x, K=1):
     
     lw = torch.cat(lw, 1)  # concat on batch
     return log_mean_exp(lw).sum()
+
+
+### contrastive loss ###
+
+def negInfoNCE(model, x, temperature = 0.07):
+    '''
+    assue model.forward will give two encodes, with projection
+    '''
+    z1, z2 = model(x)
+    z1 = F.normalize(z1, dim = -1)
+    z2 = F.normalize(z2, dim = -1)
+
+    logits = z1 @ z2.T / temperature
+    labels = torch.arange(z1.size(0)).to(z1.device)
+    #breakpoint()
+
+    return -(F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels)) / 2
+
+

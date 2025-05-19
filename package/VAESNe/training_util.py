@@ -15,7 +15,7 @@ def safelog10(x):
 
 
 def training_step(network, optimizer, data_loader, 
-                  loss_fn = elbo, K=1,
+                  loss_fn = elbo,
                   multimodal = False,
                   release_memory = False):
     """Train the model for one epoch

@@ -8,12 +8,10 @@ from torch.optim import Adam
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-from VAESNe.PhotometryNetworks import PhotometricVAENet
-from VAESNe.VanillaVAE_trainer import train
-from VAESNe.losses import VAEloss
+from VAESNe.SpectraVAE import SpectraVAE
 
 
-data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_trunc15_phase.npz')
+data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
 
@@ -28,14 +26,14 @@ wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
 mask_test = torch.tensor(mask_test == 0)
 phase_test = torch.tensor(phase_test, dtype=torch.float32)
 
-trained_vae = torch.load("../ckpt/first_spectra_vaesne.pth",
-                         map_location=torch.device('cpu'))
+trained_vae = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
+                         map_location=torch.device('cpu'), weights_only = False)
 
 #breakpoint()
-reconstruction = trained_vae.reconstruct(flux_test[idx][None,:],
+reconstruction = trained_vae.reconstruct((flux_test[idx][None,:],
                                          wavelength_test[idx][None,:],
                                             phase_test[idx][None],
-                                            mask_test[idx][None,:])
+                                            mask_test[idx][None,:]))
 
 
 import matplotlib.pyplot as plt

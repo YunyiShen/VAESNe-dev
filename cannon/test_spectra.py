@@ -54,8 +54,8 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True, pin_memory=True)
 
 
-lr = 1e-4
-epochs = 300
+lr = 2.5e-4
+epochs = 500
 
 my_vaesne = SpectraVAE(
     # data parameters
@@ -85,7 +85,7 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_spec.png")
         plt.close()
-        torch.save(my_vaesne, '../ckpt/first_specvaesne_4-2.pth')
+        torch.save(my_vaesne, f'../ckpt/first_specvaesne_4-2_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 
 

@@ -52,8 +52,8 @@ test_dataset, val_dataset = random_split(test_dataset, [0.5, 0.5])
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
-lr = 5e-4
-epochs = 300
+lr = 2.5e-4
+epochs = 500
 my_vaesne = PhotometricVAE(
     photometric_length = 90,
     num_bands = 6,
@@ -79,6 +79,6 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_photometry.png")
         plt.close()
-        torch.save(my_vaesne, '../ckpt/first_photovaesne_4-2.pth')
+        torch.save(my_vaesne, f'../ckpt/first_photovaesne_4-2_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 

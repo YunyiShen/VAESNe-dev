@@ -8,9 +8,7 @@ from torch.optim import Adam
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-from VAESNe.PhotometryNetworks import PhotometricVAENet
-from VAESNe.VanillaVAE_trainer import train
-from VAESNe.losses import VAEloss
+from VAESNe.PhotometricVAE import PhotometricVAE
 
 
 data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_trunc15_phase.npz')
@@ -27,14 +25,16 @@ phototime_test = torch.tensor(phototime_test, dtype=torch.float32)
 photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
-trained_vae = torch.load("../ckpt/first_vaesne_3-1.pth",
-                         map_location=torch.device('cpu'))
+#torch.serialization.add_safe_globals({PhotometricVAE})  # ✅ this passes the actual class object
 
-reconstruction = trained_vae.reconstruct(photoflux_test[idx][None,:],
+trained_vae = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
+                         map_location=torch.device('cpu'), weights_only = False)
+
+reconstruction = trained_vae.reconstruct((photoflux_test[idx][None,:],
                                          phototime_test[idx][None,:],
                                             photoband_test[idx][None,:],
-                                            photomask_test[idx][None,:])
-
+                                            photomask_test[idx][None,:]))
+#breakpoint()
 
 import matplotlib.pyplot as plt
 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -46,7 +46,7 @@ for i in range(6):
     thisband_time = phototime_test[idx][torch.logical_and(
         photoband_test[idx] == i,
         torch.logical_not(photomask_test[idx]))]
-    thisband_rec = reconstruction['reconstruction'][0].detach()
+    thisband_rec = reconstruction[0].detach()
     
     thisband_rec = thisband_rec[torch.logical_and(
         photoband_test[idx] == i,

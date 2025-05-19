@@ -119,6 +119,13 @@ class photospecMMVAE(nn.Module):
         with torch.no_grad():
             _, px_zs, _ = self.forward(data)
             # cross-modal matrix of reconstructions
-            recons = [[get_mean(px_z) for px_z in r] for r in px_zs]
+            recons = [[px_z.mean for px_z in r] for r in px_zs]
         return recons
+    
+    def crossmodgen(self, x_in, x_out, direction = [0,1], K = 1):
+        self.eval()
+        with torch.no_grad():
+            zs = self.vaes[direction[0]].encode(LC, mean = False).rsample(torch.Size([K]))
+            return self.vaes[direction[1]].decode(zs, x_out).mean
+
 

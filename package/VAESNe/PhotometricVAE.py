@@ -163,12 +163,14 @@ class PhotometricVAE(VAE):
         return qz_x, px_z, zs
     
     
-    def encode(self, x):
+    def encode(self, x, mean = True):
         flux, time, band, mask = x
         self.eval()
         with torch.no_grad():
             qz_x = self.qz_x(*self.enc(flux, time, band, mask))
-        return qz_x.mean
+        if mean:
+            return qz_x.mean
+        return qz_x
 
     def decode(self, zs, x):
         _, time, band, mask = x
@@ -190,7 +192,7 @@ class PhotometricVAE(VAE):
             qz_x = self.qz_x(*self.enc(flux, time, band, mask))
             zs = qz_x.rsample()  # no dim expansion
             px_z = self.px_z(*self.dec(time, band, zs, mask))
-            recon = get_mean(px_z)
+            recon = px_z.mean
         return recon
     
     def generate(self, N, time, band, mask = None):

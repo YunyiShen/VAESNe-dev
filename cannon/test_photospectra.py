@@ -90,8 +90,8 @@ photo_spect_train = multimodalDataset(photometric_train_dataset,
 train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 #val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
-lr = 1e-4
-epochs = 300
+lr = 2.5e-4
+epochs = 500
 
 my_spectravae = SpectraVAE(
     # data parameters
@@ -137,5 +137,5 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_specphoto.png")
         plt.close()
-        torch.save(my_mmvae, '../ckpt/first_photospectravaesne_4-2.pth')
+        torch.save(my_mmvae, f'../ckpt/first_photospectravaesne_4-2_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")

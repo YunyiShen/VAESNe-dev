@@ -21,9 +21,13 @@ phase_test = data['phase'][testing_idx]
 photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
 photoband_test = data['photowavelength'][testing_idx]
 
+flux_mean, flux_std = data['flux_mean'], data['flux_std']
+wavelength_mean, wavelength_std = data['wavelength_mean'], data['wavelength_std']
+phase_mean, phase_std = data['phase_mean'], data['phase_std']
 
+phototime_mean, phototime_std = data['phototime_mean'], data['phototime_std']
+photoflux_mean, photoflux_std = data['photoflux_mean'], data['photoflux_std']
 
-idx = 17
 
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
@@ -38,7 +42,7 @@ photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
-trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_500_K1.pth", # trained with K=1 on iwae
+trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_300.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
 
 photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
@@ -50,6 +54,10 @@ spectra_only = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
 trained_vae.eval()
 photo_only.eval()
 spectra_only.eval()
+
+
+########### test on one test data ###########
+idx = 86
 
 data = [
     ### photometry
@@ -85,16 +93,16 @@ fig, axs = plt.subplots(1, 5, figsize=(15, 5))
 for i in range(6):
     thisband_gt = photoflux_test[idx][torch.logical_and(
         photoband_test[idx] == i,
-        torch.logical_not(photomask_test[idx]))]
+        torch.logical_not(photomask_test[idx]))] * photoflux_std + photoflux_mean
     thisband_time = phototime_test[idx][torch.logical_and(
         photoband_test[idx] == i,
-        torch.logical_not(photomask_test[idx]))]
+        torch.logical_not(photomask_test[idx]))] * phototime_std + phototime_mean
 
     
-    thisband_rec = reconstruction[0][0][0,0].detach()
-    thisband_crossrec = reconstruction[1][0][0,0].detach()
-    thisband_photoonly = photo_only_recon[0]
-    thisband_crossmodel = spec_encode_photo_decode[0,0]
+    thisband_rec = reconstruction[0][0][0,0].detach() * photoflux_std + photoflux_mean
+    thisband_crossrec = reconstruction[1][0][0,0].detach() * photoflux_std + photoflux_mean
+    thisband_photoonly = photo_only_recon[0] * photoflux_std + photoflux_mean
+    thisband_crossmodel = spec_encode_photo_decode[0,0] * photoflux_std + photoflux_mean
 
 
 
@@ -133,11 +141,17 @@ for i in range(6):
     axs[4].scatter(thisband_time, thisband_crossmodel, s=20, marker='x')
 
 # invert y
-axs[0].set_ylim(-2, 6)
-axs[1].set_ylim(-2, 6)
-axs[2].set_ylim(-2, 6)
-axs[3].set_ylim(-2, 6)
-axs[4].set_ylim(-2, 6)
+axs[0].set_ylabel("AbsMag")
+axs[2].set_xlabel("days")
+ylow = -2 * photoflux_std + photoflux_mean
+yhigh = 6 * photoflux_std + photoflux_mean
+
+axs[0].set_ylim(ylow, yhigh)
+axs[1].set_ylim(ylow, yhigh)
+axs[2].set_ylim(ylow, yhigh)
+axs[3].set_ylim(ylow, yhigh)
+axs[4].set_ylim(ylow, yhigh)
+
 axs[0].invert_yaxis()
 axs[0].set_title("Ground truth")
 axs[1].invert_yaxis()
@@ -160,20 +174,34 @@ plt.close()
 
 
 fig, axs = plt.subplots(1, 1, figsize=(10, 5))
-axs.plot(wavelength_test[idx], flux_test[idx], label='ground truth')
-axs.plot(wavelength_test[idx], reconstruction[1][1][0,0].detach().numpy(), label='Rec-spec')
-axs.plot(wavelength_test[idx], reconstruction[0][1][0,0].detach().numpy(), label='Rec-LC')
+axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+         flux_test[idx] * flux_std + flux_mean, 
+         label='ground truth')
+axs.plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+         reconstruction[1][1][0,0].detach().numpy() * flux_std + flux_mean, 
+         label='Rec-spec')
+axs.plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+        reconstruction[0][1][0,0].detach().numpy() * flux_std + flux_mean, 
+        label='Rec-LC')
 
-axs.plot(wavelength_test[idx], spectra_only_recon[0].detach().numpy(), label='spec only')
-axs.plot(wavelength_test[idx], photo_encode_spec_decode[0,0].detach().numpy(), label='cross model')
+axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+        spectra_only_recon[0].detach().numpy() * flux_std + flux_mean, 
+        label='spec only')
+axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+         photo_encode_spec_decode[0,0].detach().numpy() * flux_std + flux_mean, 
+         label='cross model')
 
 
 
 
 # invert y
-axs.set_ylim(-2, 2)
+axs.set_ylabel("log Fnu")
+axs.set_xlabel("wavelength (Å)")
+axs.set_ylim(-2* flux_std + flux_mean, 
+              2* flux_std + flux_mean)
 axs.legend()
-
+thisphase = int(phase_test[idx] * phase_std + phase_mean)
+axs.set_title(f"spectra at phase {thisphase}")
 
 
 #plt.tight_layout()

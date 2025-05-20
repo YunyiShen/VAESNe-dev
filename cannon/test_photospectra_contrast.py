@@ -111,7 +111,8 @@ contrastnet = ContraPhotSpec(
         spec_num_heads = 4, 
         spec_num_layers = 4,
         spec_ff_dim = 32, 
-        spec_dropout = 0.1
+        spec_dropout = 0.1,
+        selfattn = True
 ).to(device)
 
 optimizer = AdamW(contrastnet.parameters(), lr=lr)

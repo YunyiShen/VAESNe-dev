@@ -40,7 +40,8 @@ class ContraPhotSpec(nn.Module):
         spec_num_heads, 
         spec_num_layers,
         spec_ff_dim, 
-        spec_dropout
+        spec_dropout,
+        selfattn
     ):
 
         super(ContraPhotSpec, self).__init__()
@@ -52,7 +53,9 @@ class ContraPhotSpec(nn.Module):
                                  photo_num_heads, 
                                  photo_ff_dim, 
                                  photo_num_layers,
-                                 photo_dropout)
+                                 photo_dropout,
+                                 selfattn
+                                 )
         self.photo_proj = singlelayerMLP(latent_len * latent_dim, proj_dim)
 
         self.spectra_encoder = spectraTransformerEncoder(
@@ -62,7 +65,9 @@ class ContraPhotSpec(nn.Module):
                  spec_num_heads, 
                  spec_num_layers,
                  spec_ff_dim, 
-                 spec_dropout)
+                 spec_dropout,
+                 selfattn
+                 )
 
         self.spectra_proj = singlelayerMLP(latent_len * latent_dim, proj_dim)
 

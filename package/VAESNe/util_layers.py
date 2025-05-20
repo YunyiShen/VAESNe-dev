@@ -39,6 +39,12 @@ class MLP(nn.Module):
 
 class learnable_fourier_encoding(nn.Module):
     def __init__(self, dim = 64):
+        '''
+        Learnable Fourier encoding for position, 
+        MLP([sin(fc(x)), cos(fc(x))])
+        Args:
+            dim: dimension
+        '''
         super(learnable_fourier_encoding, self).__init__()
         self.freq = nn.Linear(1, dim, bias=False)
         self.fc1 = nn.Linear(2 * dim, dim)
@@ -56,6 +62,11 @@ class learnable_fourier_encoding(nn.Module):
 
 class SinusoidalPositionalEmbedding(nn.Module):
     def __init__(self, dim = 64):
+        '''
+        The usual sinusoidal positional encoding
+        args: 
+            dim: the dimension
+        '''
         super().__init__()
         self.dim = dim
         self.div_term = torch.exp(torch.arange(0, dim, 2).float() * (-torch.log(torch.tensor(10000.0)) / dim))
@@ -69,6 +80,9 @@ class SinusoidalPositionalEmbedding(nn.Module):
 
 class SinusoidalMLPPositionalEmbedding(nn.Module):
     def __init__(self, dim = 64):
+        '''
+        The usual sinusoidal positional encoding with an extra MLP, inspired by https://openaccess.thecvf.com/content/ICCV2023/html/Peebles_Scalable_Diffusion_Models_with_Transformers_ICCV_2023_paper.html
+        '''
         super().__init__()
         self.dim = dim
         self.div_term = torch.exp(torch.arange(0, dim).float() * (-torch.log(torch.tensor(10000.0)) / dim))
@@ -86,7 +100,9 @@ class SinusoidalMLPPositionalEmbedding(nn.Module):
 
 
 class RelativePosition(nn.Module):
-
+    '''
+    relative positional encoding for discrete distances
+    '''
     def __init__(self, num_units, max_relative_position):
         super().__init__()
         self.num_units = num_units
@@ -109,6 +125,9 @@ class RelativePosition(nn.Module):
 
 class MultiHeadAttentionLayer_relative(nn.Module):
     def __init__(self, hid_dim, n_heads, dropout, device):
+        '''
+        Multiheaded attention with relative positional encoding
+        '''
         super().__init__()
         
         assert hid_dim % n_heads == 0
@@ -189,6 +208,9 @@ class TransformerBlock(nn.Module):
     def __init__(self, embed_dim, num_heads, ff_dim, 
                  dropout=0.1, 
                  context_self_attn = False):
+        '''
+        Usual transformer block allowing context
+        '''
         super(TransformerBlock, self).__init__()
         self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, 
                                                dropout=dropout, batch_first=True)
@@ -332,4 +354,22 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         x = self.proj(x)  # (B, dim, H/patch, W/patch)
         x = x.flatten(2).transpose(1, 2)  # (B, N, dim)
+        return x
+
+
+
+class TransformerModel(nn.Module):
+    '''
+    A minimal transformer model
+    '''
+    def __init__(self, embed_dim, num_heads, ff_dim, num_layers, dropout=0.1, selfattn = True):
+        super(TransformerModel, self).__init__()
+        self.layers = nn.ModuleList([
+            TransformerBlock(embed_dim, num_heads, ff_dim, dropout, selfattn) 
+            for _ in range(num_layers)
+        ])
+
+    def forward(self, x, context=None):
+        for layer in self.layers:
+            x = layer(x, context)
         return x

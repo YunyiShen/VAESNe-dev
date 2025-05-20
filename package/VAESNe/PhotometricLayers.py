@@ -3,29 +3,36 @@ from torch import nn
 from torch.nn import functional as F
 from .util_layers import *
 
+###############################
+# Transformers for spectra data
+###############################
 
-
-
-"""
----------------------------------------------------------------------
--- ############## our transformers ##############
----------------------------------------------------------------------
-"""
-
-
-# this will generate flux, in decoder
 class photometricTransformerDecoder(nn.Module):
     def __init__(self, photometry_length,
                  bottleneck_dim,
                  num_bands,
-                 model_dim,
-                 num_heads, 
-                 ff_dim, 
-                 num_layers,
+                 model_dim = 32,
+                 num_heads = 4, 
+                 ff_dim = 32, 
+                 num_layers = 4,
                  dropout=0.1, 
                  donotmask=False,
                  selfattn=False
                  ):
+        '''
+        A transformer to decode something (latent) into photometry given time and band
+        Args:
+            photometry_length: length of the photometry, number of measurements
+            bottleneck_dim: dimension of the thing you want to decode, should be a tensor [batch_size, bottleneck_length, bottleneck_dim]
+            num_bands: number of bands, currently embedded as class
+            model_dim: dimension the transformer should operate 
+            num_heads: number of heads in the multiheaded attention
+            ff_dim: dimension of the MLP hidden layer in transformer
+            num_layers: number of transformer blocks
+            dropout: drop out in transformer
+            donotmask: should we ignore the mask when decoding?
+            selfattn: if we want self attention to the latent
+        '''
         super(photometricTransformerDecoder, self).__init__()
         self.init_flux_embd = nn.Parameter(torch.randn(photometry_length, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
@@ -41,10 +48,12 @@ class photometricTransformerDecoder(nn.Module):
     
     def forward(self, time, band, bottleneck, mask=None):
         '''
-        time: real time of the photometry being taken (batch_size, photometry_length)
-        band: band of the photometry being taken (batch_size, photometry_length)
-
-        bottleneck: bottleneck from the encoder (batch_size, bottleneck_length, bottleneck_dim)
+        Args:
+            time: time of the photometry being taken [batch_size, photometry_length]
+            band: band of the photometry being taken [batch_size, photometry_length]
+            bottleneck: bottleneck from the encoder [batch_size, bottleneck_length, bottleneck_dim]
+        Return:
+            flux of the decoded photometry, [batch_size, photometry_length]
         '''
         if self.donotmask:
             mask = None
@@ -65,12 +74,26 @@ class photometricTransformerEncoder(nn.Module):
                  num_bands, 
                  bottleneck_length,
                  bottleneck_dim,
-                 model_dim, 
-                 num_heads, 
-                 ff_dim,
-                 num_layers,
+                 model_dim = 32, 
+                 num_heads = 4, 
+                 ff_dim = 32,
+                 num_layers = 4,
                  dropout=0.1,
                  selfattn=False):
+        '''
+        Transformer encoder for photometry, with cross attention pooling
+        Args:
+            num_bands: number of bands, currently embedded as class
+            bottleneck_length: LCs are encoded as a sequence of size [bottleneck_length, bottleneck_dim]
+            bottleneck_dim: LCs are encoded as a sequence of size [bottleneck_length, bottleneck_dim]
+            model_dim: dimension the transformer should operate 
+            num_heads: number of heads in the multiheaded attention
+            ff_dim: dimension of the MLP hidden layer in transformer
+            num_layers: number of transformer blocks
+            dropout: drop out in transformer
+            selfattn: if we want self attention to the given LC
+
+        '''
         super(photometricTransformerEncoder, self).__init__()
         self.model_dim = model_dim
         self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
@@ -86,9 +109,12 @@ class photometricTransformerEncoder(nn.Module):
 
     def forward(self, flux, time, band, mask=None):
         '''
-        flux: real flux of the photometry being taken (batch_size, photometry_length)
-        time: real time of the photometry being taken (batch_size, photometry_length)
-        band: band of the photometry being taken (batch_size, photometry_length)
+        Args:
+            flux: flux (potentially transformed) of the photometry being taken [batch_size, photometry_length]
+            time: time (potentially transformed) of the photometry being taken [batch_size, photometry_length]
+            band: band of the photometry being taken [batch_size, photometry_length]
+        Return:
+            encoding of size [batch_size, bottleneck_length, bottleneck_dim]
 
         '''
         photomety_embdding = (self.fluxfc(flux[:, :, None]) + 
@@ -101,6 +127,5 @@ class photometricTransformerEncoder(nn.Module):
         for transformerblock in self.transformerblocks:
             h = transformerblock(h, photomety_embdding, mask = None, # do not mask latent representation
                                  context_mask=mask)
-        #breakpoint()
         return self.bottleneckfc(x+h) # residual connection
         

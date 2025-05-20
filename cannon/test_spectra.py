@@ -68,7 +68,9 @@ my_vaesne = SpectraVAE(
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
-    dropout = 0.1).to(device)
+    dropout = 0.1,
+    selfattn = True
+    ).to(device)
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan

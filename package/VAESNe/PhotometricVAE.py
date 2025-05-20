@@ -15,7 +15,9 @@ class PhotometricEnc(nn.Module):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout=0.1):
+                dropout=0.1,
+                selfattn = False
+                ):
         super(PhotometricEnc, self).__init__()
 
         self.inference_transformer = photometricTransformerEncoder(
@@ -26,7 +28,9 @@ class PhotometricEnc(nn.Module):
                                  num_heads, 
                                  ff_dim, 
                                  num_layers,
-                                 dropout)
+                                 dropout,
+                                 selfattn
+                                 )
         self.latent_dim = latent_dim
         self.latent_len = latent_len
                                    
@@ -56,7 +60,9 @@ class PhotometricDec(nn.Module):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout=0.1):
+                dropout = 0.1,
+                selfattn = False
+                ):
         super(PhotometricDec, self).__init__()
 
         # p(x|z)
@@ -68,7 +74,7 @@ class PhotometricDec(nn.Module):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout)
+                dropout, selfattn)
 
     
     # p(x|z)
@@ -95,6 +101,7 @@ class PhotometricVAE(VAE):
                 ff_dim = 64, 
                 num_layers = 4,
                 dropout = 0.1,
+                selfattn = False,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
                 posterior = dist.Laplace
@@ -110,7 +117,8 @@ class PhotometricVAE(VAE):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout),
+                dropout,
+                selfattn),
             PhotometricDec(photometric_length,
                  latent_dim,
                 num_bands,
@@ -127,7 +135,7 @@ class PhotometricVAE(VAE):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout]
+                dropout, selfattn]
         )
 
         self._pz_params = nn.ParameterList([

@@ -18,11 +18,13 @@ class spectraTransformerDecoder(nn.Module):
                  num_heads, 
                  ff_dim, 
                  num_layers,
-                 dropout=0.1):
+                 dropout=0.1, 
+                 selfattn=False
+                 ):
         super(spectraTransformerDecoder, self).__init__()
         self.init_flux_embd = nn.Parameter(torch.randn(spectra_length, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
-                                                 num_heads, ff_dim, dropout) 
+                                                 num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] 
                                                 )
         self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)
@@ -54,7 +56,9 @@ class spectraTransformerEncoder(nn.Module):
                  model_dim, 
                  num_heads, 
                  num_layers,
-                 ff_dim, dropout=0.1):
+                 ff_dim, 
+                 dropout = 0.1, 
+                 selfattn = False):
         super(spectraTransformerEncoder, self).__init__()
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
         
@@ -62,7 +66,7 @@ class spectraTransformerEncoder(nn.Module):
         self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand wavelength to bottleneck
         self.flux_embd = nn.Linear(1, model_dim)
         self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
-                                                    num_heads, ff_dim, dropout) 
+                                                    num_heads, ff_dim, dropout, selfattn) 
                                                  for _ in range(num_layers)] )
         
         self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
@@ -87,10 +91,10 @@ class spectraTransformerEncoder(nn.Module):
 
 
 class TransformerModel(nn.Module):
-    def __init__(self, embed_dim, num_heads, ff_dim, num_layers, dropout=0.1):
+    def __init__(self, embed_dim, num_heads, ff_dim, num_layers, dropout=0.1, selfattn = True):
         super(TransformerModel, self).__init__()
         self.layers = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, ff_dim, dropout) 
+            TransformerBlock(embed_dim, num_heads, ff_dim, dropout, selfattn) 
             for _ in range(num_layers)
         ])
 

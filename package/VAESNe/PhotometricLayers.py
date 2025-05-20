@@ -23,11 +23,13 @@ class photometricTransformerDecoder(nn.Module):
                  ff_dim, 
                  num_layers,
                  dropout=0.1, 
-                 donotmask=False):
+                 donotmask=False,
+                 selfattn=False
+                 ):
         super(photometricTransformerDecoder, self).__init__()
         self.init_flux_embd = nn.Parameter(torch.randn(photometry_length, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
-                                                 num_heads, ff_dim, dropout) 
+                                                 num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] 
                                                 )
         self.model_dim = model_dim
@@ -67,14 +69,15 @@ class photometricTransformerEncoder(nn.Module):
                  num_heads, 
                  ff_dim,
                  num_layers,
-                 dropout=0.1):
+                 dropout=0.1,
+                 selfattn=False):
         super(photometricTransformerEncoder, self).__init__()
         self.model_dim = model_dim
         self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
         self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
         self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
-                                                    num_heads, ff_dim, dropout) 
+                                                    num_heads, ff_dim, dropout, selfattn) 
                                                  for _ in range(num_layers)] )
         
         self.bandembd = nn.Embedding(num_bands, model_dim)

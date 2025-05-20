@@ -15,7 +15,8 @@ class SpectraEnc(nn.Module):
                 num_heads, 
                 num_layers,
                 ff_dim, 
-                dropout=0.1):
+                dropout=0.1,
+                selfattn = False):
         super(SpectraEnc, self).__init__()
 
         # q(y|x) and q(z|y,x) before GumbelSoftmax and Gaussian
@@ -25,7 +26,10 @@ class SpectraEnc(nn.Module):
                  model_dim, 
                  num_heads, 
                  num_layers,
-                 ff_dim, dropout)
+                 ff_dim, 
+                 dropout,
+                 selfattn
+                 )
         self.latent_dim = latent_dim
         self.latent_len = latent_len
 
@@ -50,7 +54,8 @@ class SpectraDec(nn.Module):
                  num_heads, 
                  ff_dim, 
                  num_layers,
-                 dropout=0.1):
+                 dropout=0.1,
+                 selfattn = False):
         super(SpectraDec, self).__init__()
 
         # p(x|z)
@@ -61,7 +66,9 @@ class SpectraDec(nn.Module):
                  num_heads, 
                  ff_dim, 
                  num_layers,
-                 dropout)
+                 dropout,
+                 selfattn
+                 )
 
     
     # p(x|z)
@@ -86,6 +93,7 @@ class SpectraVAE(VAE):
                 ff_dim = 32, 
                 num_layers = 4,
                 dropout = 0.1,
+                selfattn = False,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
                 posterior = dist.Laplace):
@@ -99,7 +107,9 @@ class SpectraVAE(VAE):
                     num_heads, 
                     num_layers,
                     ff_dim, 
-                    dropout),
+                    dropout,
+                    selfattn
+                    ),
             SpectraDec(spectra_length,
                     latent_dim,
                     model_dim, 
@@ -115,7 +125,9 @@ class SpectraVAE(VAE):
                     num_heads, 
                     num_layers,
                     ff_dim, 
-                    dropout]
+                    dropout,
+                    selfattn
+                    ]
         )
         self._pz_params = nn.ParameterList([
             nn.Parameter(torch.zeros(latent_len, latent_dim), requires_grad=False),  # mu

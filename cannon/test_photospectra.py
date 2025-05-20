@@ -104,7 +104,9 @@ my_spectravae = SpectraVAE(
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
-    dropout = 0.1).to(device)
+    dropout = 0.1,
+    selfattn = True
+    ).to(device)
 
 my_photovae = PhotometricVAE(
     photometric_length = 60,
@@ -116,7 +118,9 @@ my_photovae = PhotometricVAE(
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
-    dropout = 0.1).to(device)
+    dropout = 0.1,
+    selfattn = True
+    ).to(device)
 
 my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae]).to(device)
 

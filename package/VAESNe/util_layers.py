@@ -345,15 +345,19 @@ class GumbelSoftmax(nn.Module):
         return logits, prob, y
 
 ########### image use ############
-class PatchEmbed(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, dim=768):
+class PatchEmbedding(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=128):
         super().__init__()
-        self.proj = nn.Conv2d(in_chans, dim, kernel_size=patch_size, stride=patch_size)
+        self.img_size = img_size
+        self.patch_size = patch_size
         self.num_patches = (img_size // patch_size) ** 2
 
+        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+    
     def forward(self, x):
-        x = self.proj(x)  # (B, dim, H/patch, W/patch)
-        x = x.flatten(2).transpose(1, 2)  # (B, N, dim)
+        x = self.proj(x)  # shape: [B, embed_dim, H/P, W/P]
+        x = x.flatten(2)  # shape: [B, embed_dim, N]
+        x = x.transpose(1, 2)  # shape: [B, N, embed_dim]
         return x
 
 

@@ -69,7 +69,7 @@ my_vaesne = SpectraVAE(
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = True
+    selfattn = False#True
     ).to(device)
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)

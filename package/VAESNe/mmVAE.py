@@ -103,21 +103,22 @@ class photospecMMVAE(nn.Module):
         #breakpoint()
         return qz_xs, px_zs, zss
 
-    def generate(self, N):
+    def generate(self, N, x):
         self.eval()
         with torch.no_grad():
             data = []
             pz = self.pz(*self.pz_params)
-            latents = pz.rsample(torch.Size([N]))
+            latents = pz.rsample(torch.Size([N, x[0][0].shape[0]])) # #samples, batch for conditioning
             for d, vae in enumerate(self.vaes):
-                px_z = vae.px_z(*vae.dec(latents))
-                data.append(px_z.mean.view(-1, *px_z.mean.size()[2:]))
+                px_z = vae.decode(latents, x[d])
+                #data.append(px_z.mean.view(-1, *px_z.mean.size()[2:]))
+                data.append(px_z.mean)
         return data  # list of generations---one for each modality
 
-    def reconstruct(self, data):
+    def reconstruct(self, data, K=1):
         self.eval()
         with torch.no_grad():
-            _, px_zs, _ = self.forward(data)
+            _, px_zs, _ = self.forward(data, K=K)
             # cross-modal matrix of reconstructions
             recons = [[px_z.mean for px_z in r] for r in px_zs]
         return recons

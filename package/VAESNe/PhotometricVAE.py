@@ -193,13 +193,13 @@ class PhotometricVAE(VAE):
         #breakpoint()
         return self.px_z(px_z_loc, px_z_scale)
 
-    def reconstruct(self, x):
+    def reconstruct(self, x, K=1):
         flux, time, band, mask = x
         self.eval()
         with torch.no_grad():
             qz_x = self.qz_x(*self.enc(flux, time, band, mask))
-            zs = qz_x.rsample()  # no dim expansion
-            px_z = self.px_z(*self.dec(time, band, zs, mask))
+            zs = qz_x.rsample([K])  # no dim expansion
+            px_z = self.decode(zs, x)
             recon = px_z.mean
         return recon
     

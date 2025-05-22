@@ -158,13 +158,13 @@ class SpectraVAE(VAE):
         #breakpoint()
         return qz_x, px_z, zs
     
-    def reconstruct(self, x):
+    def reconstruct(self, x, K = 1):
         flux, wavelength, phase, mask = x
         self.eval()
         with torch.no_grad():
             qz_x = self.qz_x(*self.enc(flux, wavelength, phase, mask))
-            zs = qz_x.rsample()  # no dim expansion
-            px_z = self.px_z(*self.dec(wavelength, phase, zs, mask))
+            zs = qz_x.rsample([K])  # no dim expansion
+            px_z = self.decode(zs, x)
             recon = px_z.mean
         return recon
     

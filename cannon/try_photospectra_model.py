@@ -42,7 +42,7 @@ photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
-trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_500_K1.pth", # trained with K=1 on iwae
+trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_300.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
 
 photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
@@ -57,7 +57,7 @@ spectra_only.eval()
 
 
 ########### test on one test data ###########
-idx = 86
+idx = 17
 
 data = [
     ### photometry
@@ -68,17 +68,17 @@ data = [
     ### spectra
     (flux_test[idx][None,:],
     wavelength_test[idx][None,:],
-    phase_test[idx][None],
+    phase_test[idx][None], #* 0 + torch.tensor((40-phase_mean)/phase_std, dtype = torch.float32),
     mask_test[idx][None,:])
 ]
 
+
 #breakpoint()
 with torch.no_grad():
-    reconstruction = trained_vae.reconstruct(data) # [0][0] LC->LC, [1][0]: spec->LC, [0][1]: LC-> Spec, [1][1]: spec-> spec
+    reconstruction = trained_vae.reconstruct(data, K=100) # [0][0] LC->LC, [1][0]: spec->LC, [0][1]: LC-> Spec, [1][1]: spec-> spec
 
     photo_only_recon = photo_only.reconstruct(data[0])
-    spectra_only_recon = spectra_only.reconstruct(data[1])
-
+    spectra_only_recon = spectra_only.reconstruct(data[1], K=100)
     photo_encode = photo_only.encode(data[0])[None, ...]
     spectra_encoded = spectra_only.encode(data[1])[None, ...]
     photo_encode_spec_decode = spectra_only.decode(photo_encode, data[1]).mean
@@ -98,10 +98,10 @@ for i in range(6):
         photoband_test[idx] == i,
         torch.logical_not(photomask_test[idx]))] * phototime_std + phototime_mean
 
-    
+    #breakpoint()
     thisband_rec = reconstruction[0][0][0,0].detach() * photoflux_std + photoflux_mean
     thisband_crossrec = reconstruction[1][0][0,0].detach() * photoflux_std + photoflux_mean
-    thisband_photoonly = photo_only_recon[0] * photoflux_std + photoflux_mean
+    thisband_photoonly = photo_only_recon[0,0] * photoflux_std + photoflux_mean
     thisband_crossmodel = spec_encode_photo_decode[0,0] * photoflux_std + photoflux_mean
 
 
@@ -173,35 +173,76 @@ plt.savefig("LC_reconstruction.png")
 plt.close()
 
 
-fig, axs = plt.subplots(1, 1, figsize=(10, 5))
-axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
-         flux_test[idx] * flux_std + flux_mean, 
-         label='ground truth')
-axs.plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
-         reconstruction[1][1][0,0].detach().numpy() * flux_std + flux_mean, 
-         label='Rec-spec')
-axs.plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
-        reconstruction[0][1][0,0].detach().numpy() * flux_std + flux_mean, 
-        label='Rec-LC')
+fig, axs = plt.subplots(3, 1, figsize=(10, 12))
 
+
+axs[0].plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+         flux_test[idx] * flux_std + flux_mean, 
+         label='ground truth', color = "red")
+axs[1].plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+         flux_test[idx] * flux_std + flux_mean, color = "red")
+axs[2].plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
+         flux_test[idx] * flux_std + flux_mean, color = "red")
+
+
+
+axs[0].plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+         reconstruction[1][1].mean(axis = 0)[0].detach().numpy() * flux_std + flux_mean, 
+         label='Rec-spec', color = "blue")
+
+axs[0].fill_between(wavelength_test[idx]* wavelength_std + wavelength_mean,
+                    reconstruction[1][1].quantile(dim=0, q=0.025)[0].detach().numpy() * flux_std + flux_mean, 
+                    reconstruction[1][1].quantile(dim=0, q=0.975)[0].detach().numpy() * flux_std + flux_mean,
+                    color = "blue", alpha=0.3)
+
+
+
+
+axs[1].plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+        reconstruction[0][1].mean(axis = 0)[0].detach().numpy() * flux_std + flux_mean, 
+        label='Rec-LC', color = "green")
+axs[1].fill_between(wavelength_test[idx]* wavelength_std + wavelength_mean,
+                    reconstruction[0][1].quantile(dim=0, q=0.025)[0].detach().numpy() * flux_std + flux_mean, 
+                    reconstruction[0][1].quantile(dim=0, q=0.975)[0].detach().numpy() * flux_std + flux_mean,
+                    color = "green", alpha=0.3)
+
+
+axs[2].plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+        spectra_only_recon.mean(axis = 0)[0].detach().numpy() * flux_std + flux_mean, 
+        label='spec-only', color = "orange")
+axs[2].fill_between(wavelength_test[idx]* wavelength_std + wavelength_mean,
+                    spectra_only_recon.quantile(dim=0, q=0.025)[0].detach().numpy() * flux_std + flux_mean, 
+                    spectra_only_recon.quantile(dim=0, q=0.975)[0].detach().numpy() * flux_std + flux_mean,
+                    color = "orange", alpha=0.3)
+
+
+'''
 axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
         spectra_only_recon[0].detach().numpy() * flux_std + flux_mean, 
         label='spec only')
 axs.plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
          photo_encode_spec_decode[0,0].detach().numpy() * flux_std + flux_mean, 
          label='cross model')
-
+'''
 
 
 
 # invert y
-axs.set_ylabel("log Fnu")
-axs.set_xlabel("wavelength (Å)")
-axs.set_ylim(-2* flux_std + flux_mean, 
+axs[0].set_ylabel("log Fnu")
+axs[1].set_ylabel("log Fnu")
+axs[2].set_ylabel("log Fnu")
+axs[2].set_xlabel("wavelength (Å)")
+axs[0].set_ylim(-2* flux_std + flux_mean, 
               2* flux_std + flux_mean)
-axs.legend()
+axs[1].set_ylim(-2* flux_std + flux_mean, 
+              2* flux_std + flux_mean)
+axs[2].set_ylim(-2* flux_std + flux_mean, 
+              2* flux_std + flux_mean)
+axs[0].legend()
+axs[1].legend()
+axs[2].legend()
 thisphase = int(phase_test[idx] * phase_std + phase_mean)
-axs.set_title(f"spectra at phase {thisphase}")
+axs[0].set_title(f"spectra at phase {thisphase}")
 
 
 #plt.tight_layout()
@@ -212,4 +253,21 @@ plt.close()
 
 
 
+N = 30
+generation = trained_vae.generate(x = data, N = N)
+#breakpoint()
 
+fig, axs = plt.subplots(1, 1, figsize=(10, 5))
+
+for i in range(N):
+    axs.plot(wavelength_test[idx]* wavelength_std + wavelength_mean, 
+         generation[1][i,0].detach().numpy() * flux_std + flux_mean, 
+         label='Spec-samples', alpha = 0.5)
+
+axs.set_ylabel("log Fnu")
+axs.set_xlabel("wavelength (Å)")
+axs.set_ylim(-2* flux_std + flux_mean, 
+              2* flux_std + flux_mean)
+plt.show()
+plt.savefig("spectra_priorsamples.png")
+plt.close()

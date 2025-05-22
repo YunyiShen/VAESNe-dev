@@ -92,6 +92,7 @@ train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 
 lr = 2.5e-4
 epochs = 300
+K=1
 
 my_spectravae = SpectraVAE(
     # data parameters
@@ -105,7 +106,7 @@ my_spectravae = SpectraVAE(
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = True
+    selfattn = False #True
     ).to(device)
 
 my_photovae = PhotometricVAE(
@@ -119,7 +120,7 @@ my_photovae = PhotometricVAE(
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = True
+    selfattn = False #True
     ).to(device)
 
 my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae]).to(device)
@@ -132,7 +133,7 @@ from tqdm import tqdm
 progress_bar = tqdm(range(epochs))
 for i in progress_bar:
     loss = training_step(my_mmvae, optimizer,train_loader, 
-                    loss_fn = lambda model, x: m_iwae(model, x, K=2), 
+                    loss_fn = lambda model, x: m_iwae(model, x, K=K), 
                     multimodal = True)
     all_losses[i] = loss
     if (i + 1) % 5 == 0:
@@ -142,5 +143,5 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_specphoto.png")
         plt.close()
-        torch.save(my_mmvae, f'../ckpt/first_photospectravaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(my_mmvae, f'../ckpt/first_photospectravaesne_4-2_{lr}_{epochs}_K{K}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")

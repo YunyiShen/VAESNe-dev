@@ -213,13 +213,12 @@ class HostImgVAE(VAE):
             recon = px_z.mean
         return recon
     
-    def generate(self, N, time, band, mask = None):
+    def generate(self, N):
         self.eval()
         with torch.no_grad():
             pz = self.pz(*self.pz_params)
             zs = pz.rsample(torch.Size([N]))
-            px_z_param = self.dec(zs.view(-1, zs.shape[-2], zs.shape[-1]))
-            px_z = self.px_z(px_z_param)
+            px_z = self.px_z(*self.dec(zs))
             data = px_z.mean
         return data
 

@@ -34,12 +34,12 @@ my_vaesne = HostImgVAE(
                     latent_len = 4,
                     latent_dim = 2,
                     
-                    patch_size=4, 
+                    patch_size=2, 
                     in_channels=3,
                     focal_loc = False,
-                    model_dim = 32, 
+                    model_dim = 64, 
                     num_heads = 4, 
-                    ff_dim = 32, 
+                    ff_dim = 64, 
                     num_layers = 4,
                     dropout=0.1, 
                     selfattn=False
@@ -60,7 +60,7 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_ZTFimg.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/first_hostimgvaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(my_vaesne, f'../ckpt/first_hostimgvaesne_4-4_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 
 

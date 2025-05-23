@@ -5,7 +5,7 @@ import torch
 from torchvision import transforms
 
 # multimodal stuff
-class MultimodalDataset(Dataset):
+class multimodalDataset(Dataset):
     def __init__(self, *datasets):
         assert all(len(d) == len(datasets[0]) for d in datasets), "All datasets must be the same length"
         self.datasets = datasets

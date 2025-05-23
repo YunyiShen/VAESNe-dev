@@ -134,3 +134,4 @@ tests/
 *.pdf
 
 cannon/logs
+*.npz

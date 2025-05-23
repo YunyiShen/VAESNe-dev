@@ -36,4 +36,4 @@ class ImagePathDataset(Dataset):
         image = Image.open(img_path).convert('RGB')  # Convert to RGB
         if self.transform:
             image = self.transform(image)
-        return image
+        return image, torch.tensor([])

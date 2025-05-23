@@ -206,6 +206,8 @@ class PhotometricVAE(VAE):
     def generate(self, N, time, band, mask = None):
         self.eval()
         with torch.no_grad():
+            pz = self.pz(*self.pz_params)
+            zs = pz.rsample(torch.Size([N]))
             px_z_param = self.dec(time.unsqueeze(0).expand(K, -1, -1).view(-1, time.shape[-1]), 
                                         band.unsqueeze(0).expand(K, -1, -1).view(-1, band.shape[-1]), 
                                         zs.view(-1, zs.shape[-2], zs.shape[-1]), 

@@ -1,13 +1,39 @@
 from torch.utils.data import DataLoader, TensorDataset, random_split, Dataset
+import os
+from PIL import Image
+import torch
+from torchvision import transforms
 
-class multimodalDataset(Dataset):
-    def __init__(self, d1, d2):
-        assert len(d1) == len(d2), "Datasets must be the same length"
-        self.d1 = d1
-        self.d2 = d2
+# multimodal stuff
+class MultimodalDataset(Dataset):
+    def __init__(self, *datasets):
+        assert all(len(d) == len(datasets[0]) for d in datasets), "All datasets must be the same length"
+        self.datasets = datasets
+        self.num_modes = len(datasets)
 
     def __len__(self):
-        return len(self.d1)
+        return len(self.datasets[0])
 
     def __getitem__(self, idx):
-        return self.d1[idx], self.d2[idx]
+        return tuple(d[idx] for d in self.datasets)
+
+
+class ImagePathDataset(Dataset):
+    def __init__(self, image_paths, transform=None):
+        """
+        Args:
+            image_paths (list of str): List of image file paths.
+            transform (callable, optional): Transform to apply to each image.
+        """
+        self.image_paths = image_paths
+        self.transform = transform or transforms.ToTensor()  # Default: convert to tensor
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert('RGB')  # Convert to RGB
+        if self.transform:
+            image = self.transform(image)
+        return image

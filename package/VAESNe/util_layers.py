@@ -345,6 +345,7 @@ class GumbelSoftmax(nn.Module):
         return logits, prob, y
 
 ########### image use ############
+import math
 class PatchEmbedding(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=128):
         super().__init__()

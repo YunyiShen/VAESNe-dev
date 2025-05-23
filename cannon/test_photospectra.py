@@ -91,8 +91,8 @@ train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 #val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
 lr = 2.5e-4
-epochs = 300
-K=1
+epochs = 500
+K=2
 
 my_spectravae = SpectraVAE(
     # data parameters

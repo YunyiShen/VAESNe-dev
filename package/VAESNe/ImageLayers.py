@@ -1,13 +1,16 @@
 import torch
 import torch.nn as nn
 from .util_layers import *
+import math
 
-class HostImgEncoder(nn.Module):
-    def __init__(self, bottleneck_length,
+class HostImgTransformerEncoder(nn.Module):
+    def __init__(self, 
+                    img_size,
+                    bottleneck_length,
                     bottleneck_dim,
-                    img_size=224, 
-                    patch_size=16, 
+                    patch_size=4, 
                     in_channels=3,
+                    focal_loc = False,
                     model_dim = 32, 
                     num_heads = 4, 
                     ff_dim = 32, 
@@ -15,11 +18,16 @@ class HostImgEncoder(nn.Module):
                     dropout=0.1, 
                     selfattn=False):
         super().__init__()
+        assert img_size % patch_size == 0, "image size has to be divisible to patch size"
+        self.focal_loc = focal_loc
         self.model_dim = model_dim
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
-        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.patch_embed.num_patches, embed_dim))
-        self.eventloc_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, model_dim)
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.patch_embed.num_patches, model_dim))
+        if self.focal_loc:
+            self.eventloc_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+        else:
+            self.eventloc_embd = None
 
         self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
                                                     num_heads, ff_dim, dropout, selfattn) 
@@ -27,11 +35,17 @@ class HostImgEncoder(nn.Module):
         
         self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
 
-    def forward(self, image, event_loc):
+    def forward(self, image, event_loc = None):
         image_embd = self.patch_embed(image)  # [B, N, D]
         image_embd = image_embd + self.pos_embed  # [B, N, D]
-        event_loc_embd = self.eventloc_embd(event_loc) # [B, 2, D]
-        context = torch.cat([image_embd, event_loc_embd], dim=1) # [B, N+2, D]
+        if self.focal_loc:
+            if event_loc is not None:
+                event_loc_embd = self.eventloc_embd(event_loc) # [B, 2, D]
+            else:
+                event_loc_embd = self.eventloc_embd(torch.zeros(image_embd.shape[0], 2))
+            context = torch.cat([image_embd, event_loc_embd], dim=1) # [B, N+2, D]
+        else:
+            context = image_embd
         x = self.initbottleneck[None, :, :]
         x = x.repeat(context.shape[0], 1, 1)
         h = x
@@ -41,11 +55,11 @@ class HostImgEncoder(nn.Module):
         return self.bottleneckfc(x+h) # residual connection
 
 
-class HostImgDecoder(nn.Module):
+class HostImgTransformerDecoder(nn.Module):
     def __init__(self,
+                img_size,
                 bottleneck_dim,
-                img_size=224, 
-                patch_size=16, 
+                patch_size=4, 
                 in_channels=3,
                 model_dim = 32, 
                 num_heads = 4, 
@@ -54,6 +68,7 @@ class HostImgDecoder(nn.Module):
                 dropout=0.1, 
                 selfattn=False):
         super().__init__()
+        assert img_size % patch_size == 0, "patch size has to be divisible to image size"
         self.img_size = img_size
         self.patch_size = patch_size
         self.in_channels = in_channels
@@ -62,32 +77,24 @@ class HostImgDecoder(nn.Module):
         self.num_patches = self.grid_size ** 2
         self.patch_dim = in_channels * patch_size * patch_size
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
-        self.init_img_embd = nn.Parameter(torch.randn(patch_dim , model_dim))
-
+        self.init_img_embd = nn.Parameter(torch.randn(self.num_patches , model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
                                                  num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] )
+        
+        self.decoder = MLP(model_dim, self.patch_dim)
     
     def forward(self, bottleneck):
-        x =  self.init_img_embd[None,:,:]
+        x =  self.init_img_embd[None,:,:].expand(bottleneck.shape[0], -1, -1) # expand in batch
+        #breakpoint()
         h = x
         bottleneck = self.contextfc(bottleneck)
+        #breakpoint()
         for transformerblock in self.transformerblocks:
-            h = transformerblock(h, bottleneck, mask=mask)
-        return self.depatchify(x + h)
-        
-
-
-    def depatchify(self, patches):
-        """
-        Convert [B, N, patch_dim] → [B, C, H, W]
-        """
-        B, N, _ = patches.shape
-        P = self.patch_size
-        C = self.in_channels
-        H = W = self.grid_size
-
-        patches = patches.view(B, H, W, C, P, P)       # [B, H, W, C, P, P]
-        patches = patches.permute(0, 3, 1, 4, 2, 5)    # [B, C, H, P, W, P]
-        img = patches.reshape(B, C, H * P, W * P)      # [B, C, H*P, W*P]
-        return img
+            h = transformerblock(h, bottleneck)
+        h = h+x
+        h = self.decoder(h)
+        h = h.view(x.shape[0], self.grid_size, self.grid_size, self.patch_size, self.patch_size, self.in_channels)
+         # [B, W//patch, W//patch, channel*patch*patch]
+        h = h.permute(0, 5, 1, 3, 2, 4)
+        return h.reshape(x.shape[0], self.in_channels, self.img_size, self.img_size)        

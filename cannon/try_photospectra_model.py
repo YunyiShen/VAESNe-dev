@@ -169,7 +169,7 @@ axs[4].set_title("cross model")
 #plt.tight_layout()
 
 plt.show()
-plt.savefig("LC_reconstruction.png")
+plt.savefig("LC_reconstruction.pdf")
 plt.close()
 
 
@@ -248,7 +248,7 @@ axs[0].set_title(f"spectra at phase {thisphase}")
 #plt.tight_layout()
 
 plt.show()
-plt.savefig("spectra_reconstruction.png")
+plt.savefig("spectra_reconstruction.pdf")
 plt.close()
 
 
@@ -269,5 +269,5 @@ axs.set_xlabel("wavelength (Å)")
 axs.set_ylim(-2* flux_std + flux_mean, 
               2* flux_std + flux_mean)
 plt.show()
-plt.savefig("spectra_priorsamples.png")
+plt.savefig("spectra_priorsamples.pdf")
 plt.close()

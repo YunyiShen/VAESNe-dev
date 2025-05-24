@@ -107,6 +107,7 @@ class HostImgVAE(VAE):
                     num_layers = 4,
                     dropout=0.1, 
                     selfattn=False,
+                    beta = 1.,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
                 posterior = dist.Laplace
@@ -156,7 +157,7 @@ class HostImgVAE(VAE):
             nn.Parameter(torch.zeros(latent_len, latent_dim), requires_grad=False),  # mu
             nn.Parameter(torch.ones(latent_len, latent_dim), requires_grad=False)  # logvar
         ])
-        self.llik_scaling = 1.
+        self.llik_scaling = 1./beta
         self.modelName = 'HostImage'
         self.image_size = img_size
         self.in_channels = in_channels

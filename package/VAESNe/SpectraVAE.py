@@ -260,7 +260,7 @@ class BrightSpectraVAE(VAE):
         self.spectra_length = spectra_length
         self.latent_len = latent_len
         self.latent_dim = latent_dim
-        self.brightnessfc = MLP(latent_dim, 1, [model_dim])
+        self.brightnessfc = MLP(latent_dim + 1, 1, [model_dim]) # phase is added
     
     def forward(self, x, K = 1):
         flux, wavelength, phase, mask = x
@@ -303,11 +303,12 @@ class BrightSpectraVAE(VAE):
     def decode(self, zs, x):
         _, wavelength, phase, mask = x 
         K = zs.shape[0]
-        brightness = zs[:, :,0, :]
+        phase_expand = phase.unsqueeze(0).expand(K, -1)
+        brightness = torch.concat((zs[:, :,0, :], phase_expand[:,:,None]), dim = -1)
         brightness = self.brightnessfc(brightness)
         zs = zs[:, :, 1:, :]
         px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).reshape(-1, wavelength.shape[-1]), 
-                                        phase.unsqueeze(0).expand(K, -1).reshape(-1), 
+                                        phase_expand.reshape(-1), 
                                         zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
                                         mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
         px_z_loc = px_z_loc.reshape(K, -1, self.spectra_length)
@@ -321,7 +322,7 @@ class BrightSpectraVAE(VAE):
         _, wavelength, phase, mask = x
         with torch.no_grad():
             pz = self.pz(*self.pz_params)
-            zs = pz.rsample(torch.Size([N]))
+            zs = pz.rsample(torch.Size([N,1]))
             px_z = self.decode(zs, x)
-            data = px_z.mean
+            data = px_z.mean.unsqueeze(0)
         return data

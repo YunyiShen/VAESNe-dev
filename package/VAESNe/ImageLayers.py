@@ -108,3 +108,74 @@ class HostImgTransformerDecoder(nn.Module):
          # [B, W//patch, W//patch, channel*patch*patch]
         #h = h.permute(0, 5, 1, 3, 2, 4)
         return h#.reshape(x.shape[0], self.in_channels, self.img_size, self.img_size)        
+
+
+
+
+
+class HostImgTransformerDecoderHybrid(nn.Module):
+    def __init__(self,
+                 img_size,
+                 bottleneck_dim,
+                 patch_size=4,
+                 in_channels=3,
+                 model_dim=64,
+                 num_heads=4,
+                 ff_dim=128,
+                 num_layers=4,
+                 dropout=0.1,
+                 selfattn=False
+                 ):
+        super().__init__()
+
+        assert img_size % patch_size == 0, "patch_size must divide img_size"
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.grid_size = img_size // patch_size  # e.g., 60//4 = 15
+        self.num_patches = self.grid_size ** 2
+        self.in_channels = in_channels
+
+        # context bottleneck projection
+        self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
+
+        # positional embedding for patch tokens
+        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, self.grid_size, self.grid_size)()
+
+        # transformer blocks
+        self.transformerblocks = nn.ModuleList([
+            TransformerBlock(model_dim, num_heads, ff_dim, dropout, selfattn)
+            for _ in range(num_layers)
+        ])
+
+        # each token outputs a small image patch (flattened)
+        self.decoder = nn.Linear(model_dim, in_channels * patch_size * patch_size)
+
+        # final CNN for smoothing
+        mid_channels = patch_size * 4  # heuristic: scale with patch_size
+
+        self.final_refine = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=patch_size, padding=patch_size // 2),
+            nn.ReLU(),
+            nn.Conv2d(mid_channels, in_channels, kernel_size=patch_size, padding=patch_size // 2)
+        )
+
+    def forward(self, bottleneck):
+        B = bottleneck.size(0)
+        pos_embed = self.init_img_embd[None, :, :].expand(B, -1, -1)  # [B, num_patches, model_dim]
+
+        h = pos_embed
+        context = self.contextfc(bottleneck)  # [B, bottleneck_len, model_dim]
+
+        for block in self.transformerblocks:
+            h = block(h, context)
+
+        h = h + pos_embed  # residual
+
+        # decode to patch content
+        h = self.decoder(h)  # [B, num_patches, patch_area*C]
+        h = h.view(B, self.grid_size, self.grid_size, self.patch_size, self.patch_size, self.in_channels)
+        h = h.permute(0, 5, 1, 3, 2, 4).contiguous()
+        h = h.view(B, self.in_channels, self.img_size, self.img_size)  # [B, C, H, W]
+
+        # final smoothing
+        return self.final_refine(h)

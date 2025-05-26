@@ -1,7 +1,7 @@
 import torch
 import torch.nn.init as init
 from torch.nn import functional as F
-from .ImageLayers import HostImgTransformerEncoder, HostImgTransformerDecoder
+from .ImageLayers import HostImgTransformerEncoder, HostImgTransformerDecoder, HostImgTransformerDecoderHybrid
 from .base_vae import VAE
 import torch.distributions as dist
 from torch import nn
@@ -56,7 +56,7 @@ class HostImgEnc(nn.Module):
 class HostImgDec(nn.Module):
     def __init__(self, img_size,
                 latent_dim,
-                #patch_size=4, 
+                patch_size=4, 
                 in_channels=3,
                 model_dim = 32, 
                 num_heads = 4, 
@@ -68,10 +68,10 @@ class HostImgDec(nn.Module):
         super(HostImgDec, self).__init__()
 
         # p(x|z)
-        self.generativetransformer = HostImgTransformerDecoder(
+        self.generativetransformer = HostImgTransformerDecoderHybrid(
                 img_size,
                 latent_dim,
-                #patch_size, 
+                patch_size, 
                 in_channels,
                 model_dim, 
                 num_heads, 
@@ -131,7 +131,7 @@ class HostImgVAE(VAE):
                     selfattn),
             HostImgDec(img_size,
                 latent_dim,
-                #patch_size, 
+                patch_size, 
                 in_channels,
                 model_dim, 
                 num_heads, 

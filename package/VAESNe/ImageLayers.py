@@ -148,13 +148,13 @@ class HostImgTransformerDecoderHybrid(nn.Module):
         ])
 
         # each token outputs a small image patch (flattened)
-        self.decoder = nn.Linear(model_dim, in_channels * patch_size * patch_size)
+        self.decoder = nn.Linear(model_dim, model_dim * patch_size * patch_size)
 
         # final CNN for smoothing
-        mid_channels = patch_size * 4  # heuristic: scale with patch_size
+        mid_channels = model_dim * 4  # heuristic: scale with patch_size
 
         self.final_refine = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=patch_size, padding='same'),
+            nn.Conv2d(model_dim, mid_channels, kernel_size=patch_size, padding='same'),
             nn.ReLU(),
             nn.Conv2d(mid_channels, in_channels, kernel_size=patch_size, padding='same')
         )
@@ -162,7 +162,7 @@ class HostImgTransformerDecoderHybrid(nn.Module):
     def forward(self, bottleneck):
         B = bottleneck.size(0)
         pos_embed = self.init_img_embd[None, :, :].expand(B, -1, -1)  # [B, num_patches, model_dim]
-
+        model_dim = pos_embed.shape[-1]
         h = pos_embed
         context = self.contextfc(bottleneck)  # [B, bottleneck_len, model_dim]
 
@@ -173,8 +173,8 @@ class HostImgTransformerDecoderHybrid(nn.Module):
 
         # decode to patch content
         h = self.decoder(h)  # [B, num_patches, patch_area*C]
-        h = h.view(B, self.grid_size, self.grid_size, self.patch_size, self.patch_size, self.in_channels)
+        h = h.view(B, self.grid_size, self.grid_size, self.patch_size, self.patch_size, model_dim)
         h = h.permute(0, 5, 1, 3, 2, 4).contiguous()
-        h = h.view(B, self.in_channels, self.img_size, self.img_size)  # [B, C, H, W]
+        h = h.view(B, model_dim, self.img_size, self.img_size)  # [B, C, H, W]
         # final smoothing
         return self.final_refine(h)

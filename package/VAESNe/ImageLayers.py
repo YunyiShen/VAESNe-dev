@@ -154,9 +154,9 @@ class HostImgTransformerDecoderHybrid(nn.Module):
         mid_channels = patch_size * 4  # heuristic: scale with patch_size
 
         self.final_refine = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=patch_size, padding=patch_size // 2),
+            nn.Conv2d(in_channels, mid_channels, kernel_size=patch_size, padding='same'),
             nn.ReLU(),
-            nn.Conv2d(mid_channels, in_channels, kernel_size=patch_size, padding=patch_size // 2)
+            nn.Conv2d(mid_channels, in_channels, kernel_size=patch_size, padding='same')
         )
 
     def forward(self, bottleneck):
@@ -176,6 +176,5 @@ class HostImgTransformerDecoderHybrid(nn.Module):
         h = h.view(B, self.grid_size, self.grid_size, self.patch_size, self.patch_size, self.in_channels)
         h = h.permute(0, 5, 1, 3, 2, 4).contiguous()
         h = h.view(B, self.in_channels, self.img_size, self.img_size)  # [B, C, H, W]
-
         # final smoothing
         return self.final_refine(h)

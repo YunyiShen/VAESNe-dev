@@ -59,6 +59,56 @@ class learnable_fourier_encoding(nn.Module):
         encoding = self.fc2(encoding)
         return encoding
 
+class SinusoidalPositionalEmbedding2D(nn.Module):
+    def __init__(self, d_model: int, height: int, width: int):
+        """
+        2D sinusoidal positional embedding module.
+
+        Args:
+            d_model (int): Embedding dimension. Must be divisible by 4.
+            height (int): Height of the image/grid.
+            width (int): Width of the image/grid.
+            device (str): PyTorch device.
+        """
+        super().__init__()
+        if d_model % 4 != 0:
+            raise ValueError("d_model must be divisible by 4 for 2D sinusoidal embeddings.")
+
+        self.d_model = d_model
+        self.height = height
+        self.width = width
+        pos_embed = self._build_embedding()
+        self.register_buffer('pos_embed', pos_embed, persistent=False)  # (H*W, d_model)
+
+    def _build_embedding(self):
+        H, W = self.height, self.width
+        d_model = self.d_model
+
+        y_embed = torch.arange(H).unsqueeze(1).repeat(1, W)
+        x_embed = torch.arange(W).unsqueeze(0).repeat(H, 1)
+
+        x_embed = x_embed.flatten()  # (H*W,)
+        y_embed = y_embed.flatten()  # (H*W,)
+
+        dim_half = d_model // 2
+        omega = torch.arange(dim_half) / dim_half
+        omega = 1. / (10000 ** omega)  # (d_model/2,)
+
+        out_x = x_embed[:, None] * omega[None, :]
+        out_y = y_embed[:, None] * omega[None, :]
+
+        pos_x = torch.cat([torch.sin(out_x), torch.cos(out_x)], dim=-1)  # (H*W, d_model)
+        pos_y = torch.cat([torch.sin(out_y), torch.cos(out_y)], dim=-1)  # (H*W, d_model)
+
+        pos_embed = pos_x + pos_y  # (H*W, d_model)
+        return pos_embed
+
+    def forward(self):
+        """
+        Returns:
+            Tensor of shape (H*W, d_model): positional embeddings.
+        """
+        return self.pos_embed
 
 class SinusoidalPositionalEmbedding(nn.Module):
     def __init__(self, dim = 64):

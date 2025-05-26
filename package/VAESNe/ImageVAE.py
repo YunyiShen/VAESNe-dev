@@ -56,7 +56,7 @@ class HostImgEnc(nn.Module):
 class HostImgDec(nn.Module):
     def __init__(self, img_size,
                 latent_dim,
-                patch_size=4, 
+                #patch_size=4, 
                 in_channels=3,
                 model_dim = 32, 
                 num_heads = 4, 
@@ -71,7 +71,7 @@ class HostImgDec(nn.Module):
         self.generativetransformer = HostImgTransformerDecoder(
                 img_size,
                 latent_dim,
-                patch_size, 
+                #patch_size, 
                 in_channels,
                 model_dim, 
                 num_heads, 
@@ -131,7 +131,7 @@ class HostImgVAE(VAE):
                     selfattn),
             HostImgDec(img_size,
                 latent_dim,
-                patch_size, 
+                #patch_size, 
                 in_channels,
                 model_dim, 
                 num_heads, 

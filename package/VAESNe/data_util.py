@@ -26,7 +26,10 @@ class ImagePathDataset(Dataset):
             transform (callable, optional): Transform to apply to each image.
         """
         self.image_paths = image_paths
-        self.transform = transform or transforms.ToTensor()  # Default: convert to tensor
+        self.transform = transform or transforms.Compose([
+                                            transforms.ToTensor(), 
+                                            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  
+                                            ]) 
 
     def __len__(self):
         return len(self.image_paths)

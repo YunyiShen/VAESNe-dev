@@ -191,13 +191,14 @@ class SpectraVAE(VAE):
 
         return self.px_z(px_z_loc, px_z_scale)
     
-    def generate(self, N, wavelength, phase, mask = None):
+    def generate(self, N, x):
         self.eval()
+        _, wavelength, phase, mask = x
         with torch.no_grad():
             pz = self.pz(*self.pz_params)
-            zs = pz.rsample(torch.Size([N]))
-            px_z = self.px_z(*self.dec(wavelength, phase, zs, mask))
-            data = px_z.mean
+            zs = pz.rsample(torch.Size([N,1]))
+            px_z = self.decode(zs, x)
+            data = px_z.mean.unsqueeze(0)
         return data
 
 

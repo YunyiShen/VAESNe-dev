@@ -83,7 +83,7 @@ class HostImgTransformerDecoder(nn.Module):
         #self.num_patches = self.grid_size ** 2
         #self.patch_dim = in_channels * patch_size * patch_size
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
-        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, img_size, img_size)() #nn.Parameter(torch.randn(img_size ** 2, model_dim))
+        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, img_size, img_size) #nn.Parameter(torch.randn(img_size ** 2, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
                                                  num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] )
@@ -94,7 +94,7 @@ class HostImgTransformerDecoder(nn.Module):
             self.decoder = nn.Linear(model_dim, in_channels)
     
     def forward(self, bottleneck):
-        x =  self.init_img_embd[None,:,:].expand(bottleneck.shape[0], -1, -1) # expand in batch
+        x =  self.init_img_embd()[None,:,:].expand(bottleneck.shape[0], -1, -1) # expand in batch
         #breakpoint()
         h = x
         bottleneck = self.contextfc(bottleneck)

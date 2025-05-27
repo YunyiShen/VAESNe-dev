@@ -13,12 +13,14 @@ def expand_first_dim(t, K):
     shape = t.shape
     return t.unsqueeze(0).expand((K,) + shape)
 
-def elbo(model, x, K=1):
+def elbo(model, x, K=1, debug = False):
     """Computes E_{p(x)}[ELBO] """
     qz_x, px_z, _ = model(x, K)
     data = expand_first_dim(x[0], K)
     lpx_z = px_z.log_prob(data).reshape(*px_z.batch_shape[:2], -1) * model.llik_scaling # take data
     kld = kl_divergence(qz_x, model.pz(*model.pz_params))
+    if debug:
+        print(f"kl: {kld.sum((-1,-2)).mean()}, llk: {-lpx_z.sum(-1).mean()}")
     return (lpx_z.sum(-1) - kld.sum((-1,-2))[None,:]).mean()#.mean(0).sum()
 
 

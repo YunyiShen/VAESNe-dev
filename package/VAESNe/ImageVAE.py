@@ -63,15 +63,29 @@ class HostImgDec(nn.Module):
                 ff_dim = 32, 
                 num_layers = 4,
                 dropout=0.1, 
-                selfattn=False
+                selfattn=False,
+                hybrid = True
                 ):
         super(HostImgDec, self).__init__()
 
         # p(x|z)
-        self.generativetransformer = HostImgTransformerDecoderHybrid(
+        if hybrid:
+            self.generativetransformer = HostImgTransformerDecoderHybrid(
                 img_size,
                 latent_dim,
                 patch_size, 
+                in_channels,
+                model_dim, 
+                num_heads, 
+                ff_dim, 
+                num_layers,
+                dropout, 
+                selfattn)
+        else:
+            # pixel directly
+            self.generativetransformer = HostImgTransformerDecoder(
+                img_size,
+                latent_dim,
                 in_channels,
                 model_dim, 
                 num_heads, 
@@ -107,6 +121,7 @@ class HostImgVAE(VAE):
                     num_layers = 4,
                     dropout=0.1, 
                     selfattn=False,
+                    hybrid = True,
                     beta = 1.,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
@@ -137,7 +152,10 @@ class HostImgVAE(VAE):
                 num_heads, 
                 ff_dim, 
                 num_layers,
-                dropout),
+                dropout,
+                selfattn,
+                hybrid
+                ),
             params = [img_size, 
                     latent_len,
                     latent_dim,
@@ -210,7 +228,7 @@ class HostImgVAE(VAE):
         with torch.no_grad():
             qz_x = self.qz_x(*self.enc(image, event_loc))
             zs = qz_x.rsample([K])  # no dim expansion
-            px_z = self.decode(zs, x)
+            px_z = self.decode(zs)
             recon = px_z.mean
         return recon
     

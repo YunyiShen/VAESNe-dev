@@ -25,7 +25,7 @@ class HostImgTransformerEncoder(nn.Module):
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
         self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, model_dim)
         if sincosin:
-            self.pos_embed = SinusoidalPositionalEmbedding2D(model_dim, img_size//patch_size,img_size//patch_size)()
+            self.pos_embed = SinusoidalPositionalEmbedding2D(model_dim, img_size//patch_size,img_size//patch_size)
         else:
             self.pos_embed = nn.Parameter(torch.zeros(1, self.patch_embed.num_patches, model_dim))
         if self.focal_loc:
@@ -41,8 +41,8 @@ class HostImgTransformerEncoder(nn.Module):
 
     def forward(self, image, event_loc = None):
         image_embd = self.patch_embed(image)  # [B, N, D]
-
-        image_embd = image_embd + self.pos_embed  # [B, N, D]
+        #breakpoint()
+        image_embd = image_embd + self.pos_embed()  # [B, N, D]
         if self.focal_loc:
             if event_loc is not None:
                 event_loc_embd = self.eventloc_embd(event_loc) # [B, 2, D]
@@ -139,7 +139,7 @@ class HostImgTransformerDecoderHybrid(nn.Module):
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
 
         # positional embedding for patch tokens
-        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, self.grid_size, self.grid_size)()
+        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, self.grid_size, self.grid_size)
 
         # transformer blocks
         self.transformerblocks = nn.ModuleList([
@@ -161,11 +161,11 @@ class HostImgTransformerDecoderHybrid(nn.Module):
 
     def forward(self, bottleneck):
         B = bottleneck.size(0)
-        pos_embed = self.init_img_embd[None, :, :].expand(B, -1, -1)  # [B, num_patches, model_dim]
+        pos_embed = self.init_img_embd()[None, :, :].expand(B, -1, -1)  # [B, num_patches, model_dim]
         model_dim = pos_embed.shape[-1]
         h = pos_embed
         context = self.contextfc(bottleneck)  # [B, bottleneck_len, model_dim]
-
+        
         for block in self.transformerblocks:
             h = block(h, context)
 

@@ -135,3 +135,4 @@ tests/
 
 cannon/logs
 *.npz
+cannon/data

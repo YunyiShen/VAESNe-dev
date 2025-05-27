@@ -96,7 +96,7 @@ epochs = 500
 contrastnet = ContraPhotSpec(
     # latent things
         latent_len = 4,
-        latent_dim = 2,
+        latent_dim = 4,
         proj_dim = 8,
         # photometric things
         num_bands = 6,
@@ -133,7 +133,7 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_specphotocontrast.png")
         plt.close()
-        torch.save(contrastnet, f'../ckpt/first_photospectra_contrast_4-2_{lr}_{epochs}.pth')
+        torch.save(contrastnet, f'../ckpt/goldstein_photospectra_contrast_4-4_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 
 

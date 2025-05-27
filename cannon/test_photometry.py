@@ -53,19 +53,20 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
 lr = 2.5e-4
-epochs = 500
+epochs = 200
 my_vaesne = PhotometricVAE(
     photometric_length = 60,
     num_bands = 6,
     # model parameters
     latent_len = 4,
-    latent_dim = 2,
+    latent_dim = 4,
     model_dim = 32, 
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = False#True
+    selfattn = False,#True
+    beta = 0.5
     ).to(device)
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)
@@ -81,6 +82,6 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_photometry.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/first_photovaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-4_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 

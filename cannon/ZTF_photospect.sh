@@ -5,11 +5,11 @@
 #SBATCH -p iaifi_gpu
 #SBATCH --gres=gpu:1
 #SBATCH --mem=16G
-#SBATCH -o ./logs/photospectraVAE.out  # File to which STDOUT will be written, %j inserts jobid
-#SBATCH -e ./logs/photospectraVAE.err  # File to which STDERR will be written, %j inserts jobid
+#SBATCH -o ./logs/ZTFphotospect.out  # File to which STDOUT will be written, %j inserts jobid
+#SBATCH -e ./logs/ZTFphotospect.err  # File to which STDERR will be written, %j inserts jobid
 #SBATCH --mail-type=END
 #SBATCH --mail-user=yshen99@mit.edu
 module load python/3.10.13-fasrc01
 source activate torch
 
-python test_photospectra.py
+python ZTF_photospect.py

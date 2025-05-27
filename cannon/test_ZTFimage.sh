@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH -c 1
 #SBATCH -N 1
-#SBATCH -t 1-00:30
+#SBATCH -t 2-00:30
 #SBATCH -p iaifi_gpu
 #SBATCH --gres=gpu:1
-#SBATCH --mem=8G
+#SBATCH --mem=64G
 #SBATCH -o ./logs/ZTFimageVAE.out  # File to which STDOUT will be written, %j inserts jobid
 #SBATCH -e ./logs/ZTFimageVAE.err  # File to which STDERR will be written, %j inserts jobid
 #SBATCH --mail-type=END

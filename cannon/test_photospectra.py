@@ -9,8 +9,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 from matplotlib import pyplot as plt
 
 
-from VAESNe.SpectraVAE import SpectraVAE
-from VAESNe.PhotometricVAE import PhotometricVAE
+from VAESNe.SpectraVAE import BrightSpectraVAE, SpectraVAE
+from VAESNe.PhotometricVAE import BrightPhotometricVAE, PhotometricVAE
 from VAESNe.training_util import training_step
 from VAESNe.losses import elbo, m_iwae, _m_iwae
 from VAESNe.data_util import multimodalDataset
@@ -90,34 +90,38 @@ photo_spect_train = multimodalDataset(photometric_train_dataset,
 train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 #val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
-lr = 2.5e-4
-epochs = 500
-K=2
+lr = 1e-3 #2.5e-4
+epochs = 200
+K=8
+latent_len = 4
+latent_dim = 4
+beta = 0.5
+model_dim = 32
 
 my_spectravae = SpectraVAE(
     # data parameters
-    spectra_length = 982,
+    spectra_length = flux.shape[1],
 
     # model parameters
-    latent_len = 4,
-    latent_dim = 2,
-    model_dim = 32, 
+    latent_len = latent_len,
+    latent_dim = latent_dim,
+    model_dim = model_dim, 
     num_heads = 4, 
-    ff_dim = 32, 
+    ff_dim = model_dim, 
     num_layers = 4,
     dropout = 0.1,
     selfattn = False #True
     ).to(device)
 
 my_photovae = PhotometricVAE(
-    photometric_length = 60,
+    photometric_length = photoflux.shape[1],
     num_bands = 6,
     # model parameters
-    latent_len = 4,
-    latent_dim = 2,
-    model_dim = 32, 
+    latent_len = latent_len,
+    latent_dim = latent_dim,
+    model_dim = model_dim, 
     num_heads = 4, 
-    ff_dim = 32, 
+    ff_dim = model_dim, 
     num_layers = 4,
     dropout = 0.1,
     selfattn = False #True
@@ -141,7 +145,7 @@ for i in progress_bar:
         plt.xlabel("training epochs")
         plt.ylabel("loss")
         plt.show()
-        plt.savefig("./logs/training_specphoto.png")
+        plt.savefig("./logs/goldstein_training_specphoto.png")
         plt.close()
-        torch.save(my_mmvae, f'../ckpt/first_photospectravaesne_4-2_{lr}_{epochs}_K{K}.pth')
+        torch.save(my_mmvae, f'../ckpt/goldstein_photospectravaesne_{latent_len}-{latent_dim}_{lr}_{epochs}_K{K}_beta{beta}_modeldim{model_dim}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")

@@ -42,7 +42,7 @@ photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
-trained_vae = torch.load("../ckpt/first_photospectravaesne_4-2_0.00025_300.pth", # trained with K=1 on iwae
+trained_vae = torch.load("../ckpt/goldstein_brightphotospectravaesne_4-4_0.001_500_K8_beta1.0_modeldim32.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
 
 photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",

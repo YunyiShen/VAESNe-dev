@@ -307,13 +307,12 @@ class BrightSpectraVAE(VAE):
         phase_expand = phase.unsqueeze(0).expand(K, -1)
         brightness = torch.concat((zs[:, :,0, :], phase_expand[:,:,None]), dim = -1)
         brightness = self.brightnessfc(brightness)
-        zs = zs[:, :, 1:, :]
         px_z_loc, px_z_scale = self.dec(wavelength.unsqueeze(0).expand(K, -1, -1).reshape(-1, wavelength.shape[-1]), 
                                         phase_expand.reshape(-1), 
                                         zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
                                         mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
         px_z_loc = px_z_loc.reshape(K, -1, self.spectra_length)
-        px_z_loc = px_z_loc + brightness #- px_z_loc.mean(axis = 2)[:, :, None] 
+        px_z_loc = px_z_loc + brightness - px_z_loc.mean(axis = 2)[:, :, None] 
         px_z_scale = px_z_scale.reshape(K, -1, self.spectra_length)
 
         return self.px_z(px_z_loc, px_z_scale)

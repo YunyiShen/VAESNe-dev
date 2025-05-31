@@ -90,9 +90,9 @@ photo_spect_train = multimodalDataset(photometric_train_dataset,
 train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 #val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
-lr = 1e-3 #2.5e-4
+lr = 2.5e-4
 epochs = 200
-K=8
+K=2
 latent_len = 4
 latent_dim = 4
 beta = 0.5
@@ -127,7 +127,7 @@ my_photovae = PhotometricVAE(
     selfattn = False #True
     ).to(device)
 
-my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae]).to(device)
+my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae], beta = beta).to(device)
 
 optimizer = AdamW(my_mmvae.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan

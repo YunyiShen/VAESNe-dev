@@ -59,7 +59,7 @@ my_vaesne = PhotometricVAE(
     num_bands = 6,
     # model parameters
     latent_len = 4,
-    latent_dim = 4,
+    latent_dim = 2,
     model_dim = 32, 
     num_heads = 4, 
     ff_dim = 32, 
@@ -82,6 +82,6 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_photometry.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-4_{lr}_{epochs}.pth')
+        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-2_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 

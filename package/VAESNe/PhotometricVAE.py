@@ -317,14 +317,13 @@ class BrightPhotometricVAE(VAE):
         K = zs.shape[0]
         brightness = zs[:, :,0, :]
         brightness = self.brightnessfc(brightness)
-        zs = zs[:, :, 1:, :]
         px_z_loc, px_z_scale = self.dec(time.unsqueeze(0).expand(K, -1, -1).reshape(-1, time.shape[-1]), 
                                         band.unsqueeze(0).expand(K, -1, -1).reshape(-1, band.shape[-1]), 
                                         zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
                                         mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
         
         px_z_loc = px_z_loc.reshape(K, -1, self.photometric_length)
-        px_z_loc = px_z_loc + brightness #- px_z_loc.mean(axis = 2)[:, :, None] 
+        px_z_loc = px_z_loc + brightness - px_z_loc.mean(axis = 2)[:, :, None] 
         px_z_scale = px_z_scale.reshape(K, -1, self.photometric_length)
         #breakpoint()
         return self.px_z(px_z_loc, px_z_scale)

@@ -7,9 +7,13 @@
 #SBATCH -e ./logs/goldstein-masking_%j_%A_%a.err  # File to which STDERR will be written, %j inserts jobid
 #SBATCH --mail-type=END
 #SBATCH --mail-user=yshen99@mit.edu
+#SBATCH --array=0-10
+
+TASK_ID=$SLURM_ARRAY_TASK_ID
+TOTAL_TASKS=$SLURM_ARRAY_TASK_COUNT
 
 # load modules
 module load python/3.10.13-fasrc01
 mamba activate torch
 
-python gradual_masking.py
+python gradual_masking.py --jobid $TASK_ID --totaljobs $TOTAL_TASKS --latlen 2

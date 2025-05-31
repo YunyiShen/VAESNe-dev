@@ -3,8 +3,8 @@
 #SBATCH -t 0-01:00          # Runtime in D-HH:MM, minimum of 10 minutes
 #SBATCH -p serial_requeue   # Partition to submit to
 #SBATCH --mem=64G          # Memory pool for all cores (see also --mem-per-cpu)
-#SBATCH -o ./logs/goldstein-mmvae_%j_%A_%a.out  # File to which STDOUT will be written, %j inserts jobid
-#SBATCH -e ./logs/goldstein-mmvae_%j_%A_%a.err  # File to which STDERR will be written, %j inserts jobid
+#SBATCH -o ./logs/goldstein-mmvae44_%j_%A_%a.out  # File to which STDOUT will be written, %j inserts jobid
+#SBATCH -e ./logs/goldstein-mmvae44_%j_%A_%a.err  # File to which STDERR will be written, %j inserts jobid
 #SBATCH --mail-type=END
 #SBATCH --mail-user=yshen99@mit.edu
 #SBATCH --array=0-399

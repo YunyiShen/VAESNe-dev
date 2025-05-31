@@ -72,13 +72,13 @@ def main():
     photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
     ####### load model ########
-    trained_vae = torch.load("../../../ckpt/goldstein_photospectravaesne_4-2_0.00025_200_K2_beta1.0_modeldim32.pth", # trained with K=1 on iwae
+    trained_vae = torch.load("../../../ckpt/goldstein_photospectravaesne_4-4_0.00025_200_K2_beta1.0_modeldim32.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
 
-    photo_only = torch.load("../../../ckpt/goldstein_photovaesne_4-2_0.00025_200.pth",
+    photo_only = torch.load("../../../ckpt/goldstein_photovaesne_4-4_0.00025_200.pth",
                          map_location=torch.device('cpu'), weights_only = False)
 
-    spectra_only = torch.load('../../../ckpt/goldstein_specvaesne_4-2_0.00025_200.pth',
+    spectra_only = torch.load('../../../ckpt/goldstein_specvaesne_4-4_0.00025_200.pth',
                          map_location=torch.device('cpu'), weights_only = False)
 
     trained_vae.eval()
@@ -111,7 +111,7 @@ def main():
     
 
     #breakpoint()
-    np.savez(f"./res/photospec_test_{jobid}_{totaljobs}.npz",
+    np.savez(f"./res/photospec44_test_{jobid}_{totaljobs}.npz",
         ### LC data
         photoflux = photoflux_test[start_idx:end_idx].detach().cpu().numpy() * photoflux_std + photoflux_mean ,
         phototime = phototime_test[start_idx:end_idx].detach().cpu().numpy() * phototime_std + phototime_mean,

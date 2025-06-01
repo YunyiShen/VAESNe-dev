@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-def plot_lsst_lc(photoband, photomag, phototime, photomask, ax = None, label = False):
+def plot_lsst_lc(photoband, photomag, phototime, photomask, ax = None, label = False, s = 5, lw = 2):
     lsst_bands = ["u", "g", "r", "i", "z", "y"]
     colors = ["purple", "blue", "darkgreen", "lime", "orange", "red"]
     photoband = photoband[~photomask]
@@ -12,10 +12,10 @@ def plot_lsst_lc(photoband, photomag, phototime, photomask, ax = None, label = F
         idx = np.where(photoband == bnd)[0]
         if len(idx) > 0:
             if label:
-                ax.scatter(phototime[idx], photomag[idx], label=lsst_bands[bnd], s=5, color=colors[bnd])
+                ax.scatter(phototime[idx], photomag[idx], label=lsst_bands[bnd], s=s, color=colors[bnd])
             else:
-                ax.scatter(phototime[idx], photomag[idx], s=5, color=colors[bnd])
-            ax.plot(phototime[idx], photomag[idx], color=colors[bnd], alpha=0.5)
+                ax.scatter(phototime[idx], photomag[idx], s=s, color=colors[bnd])
+            ax.plot(phototime[idx], photomag[idx], color=colors[bnd], alpha=0.5, lw = lw)
     ax.invert_yaxis()
     if ax is None:
         return fig

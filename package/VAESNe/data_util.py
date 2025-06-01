@@ -3,6 +3,8 @@ import os
 from PIL import Image
 import torch
 from torchvision import transforms
+import numpy as np
+import re
 
 # multimodal stuff
 class multimodalDataset(Dataset):
@@ -69,3 +71,9 @@ class ImagePathDatasetAug(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, torch.tensor([])
+
+
+def get_goldstein_params(filename):
+    params = re.findall(r'[-+]?\d*\.\d+e[-+]?\d+', filename)
+    params = [float(i) for i in params]
+    return np.array(params)

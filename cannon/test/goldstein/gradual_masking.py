@@ -66,13 +66,14 @@ def main():
 
     missing_portion = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9]
     initidx = jobid
-    idx_to_test = [initidx + i for i in range(5)] #[15, 16, 17, 18, 19]
+    idx_to_test = [initidx * 5 + i for i in range(5)] #[15, 16, 17, 18, 19]
+    #breakpoint()
     this_mask = []
     # should be from the same event
-    this_photo_flux = photoflux_test[initidx]
-    this_photo_time = phototime_test[initidx]
-    this_photo_mask = photomask_test[initidx]
-    this_photo_band = photoband_test[initidx]
+    this_photo_flux = photoflux_test[initidx*5]
+    this_photo_time = phototime_test[initidx*5]
+    this_photo_mask = photomask_test[initidx*5]
+    this_photo_band = photoband_test[initidx*5]
     spect_res = [[] for _ in range(len(missing_portion))]
     spect_masks = [[] for _ in range(len(missing_portion))]
     spect_phase = [[] for _ in range(len(missing_portion))]

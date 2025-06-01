@@ -51,7 +51,9 @@ backbone = "goldstein_photospectra_contrast_4-4_0.00025_500"
 trained_contrast = torch.load(f"../ckpt/{backbone}.pth", # trained with K=1 on iwae
                          map_location=device, weights_only = False)
 
-regrehead = contrasphotoregressionHead(trained_contrast, outdim = goldstein.shape[1]).to(device)
+regrehead = contrasphotoregressionHead(trained_contrast, 
+            outdim = goldstein.shape[1], 
+            MLPlatent = [128, 128, 128]).to(device)
 regrehead.train()
 
 ##### optimizer ####

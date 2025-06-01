@@ -9,7 +9,7 @@ class VAEregressionHead(nn.Module):
     def __init__(self, vae, 
                 outdim, 
                 freeze_vae = True,
-                latent = [64, 64]
+                MLPlatent = [64, 64]
                 ):
 
         super(VAEregressionHead, self).__init__()
@@ -17,7 +17,7 @@ class VAEregressionHead(nn.Module):
             for param in vae.parameters():
                 param.requires_grad = False
         self.vae = vae
-        self.outfc = MLP(self.vae.latent_len * self.vae.latent_dim, outdim, latent)
+        self.outfc = MLP(self.vae.latent_len * self.vae.latent_dim, outdim, MLPlatent)
     
     def forward(self, x):
         h = self.vae.encode(x, True)
@@ -28,7 +28,7 @@ class contrasphotoregressionHead(nn.Module):
     def __init__(self, contrastnet, 
                 outdim, 
                 freeze_contrastnet = True,
-                latent = [64, 64]
+                MLPlatent = [64, 64]
                 ):
 
         super(contrasphotoregressionHead, self).__init__()
@@ -36,7 +36,7 @@ class contrasphotoregressionHead(nn.Module):
             for param in contrastnet.parameters():
                 param.requires_grad = False
         self.contrastnet = contrastnet
-        self.outfc = MLP(self.contrastnet.latent_len * self.contrastnet.latent_dim, outdim, latent)
+        self.outfc = MLP(self.contrastnet.latent_len * self.contrastnet.latent_dim, outdim, MLPlatent)
     
     def forward(self, x):
         h = self.contrastnet.photo_enc(x)

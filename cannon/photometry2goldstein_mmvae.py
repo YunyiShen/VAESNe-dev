@@ -52,7 +52,9 @@ backbone = "goldstein_photospectravaesne_4-4_0.00025_200_K2_beta1.0_modeldim32"
 trained_vae = torch.load(f"../ckpt/{backbone}.pth", # trained with K=1 on iwae
                          map_location="cpu", weights_only = False)
 
-regrehead = VAEregressionHead(trained_vae.vaes[0], outdim = goldstein.shape[1]).to(device)
+regrehead = VAEregressionHead(trained_vae.vaes[0], 
+                    outdim = goldstein.shape[1], 
+                    MLPlatent = [128, 128, 128]).to(device)
 regrehead.train()
 print("training start")
 ##### optimizer ####

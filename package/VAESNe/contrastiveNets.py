@@ -98,5 +98,5 @@ class ContraPhotSpec(nn.Module):
         self.eval()
         spec_flux, wavelength, phase, spec_mask = x
         with torch.no_grad():
-            return self.spectra_encoded(spec_flux, wavelength, phase, spec_mask)
+            return self.spectra_encoder(spec_flux, wavelength, phase, spec_mask)
 

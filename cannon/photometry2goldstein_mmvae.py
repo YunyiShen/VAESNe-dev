@@ -54,11 +54,11 @@ trained_vae = torch.load(f"../ckpt/{backbone}.pth", # trained with K=1 on iwae
 
 regrehead = VAEregressionHead(trained_vae.vaes[0], 
                     outdim = goldstein.shape[1], 
-                    MLPlatent = [128, 128, 128]).to(device)
+                    MLPlatent = [128, 128]*2).to(device)
 regrehead.train()
 print("training start")
 ##### optimizer ####
-lr = 2.5e-4
+lr = 5e-4
 epochs = 500
 
 optimizer = AdamW(regrehead.parameters(), lr=lr)
@@ -85,5 +85,5 @@ for i in progress_bar:
     avg_loss = total_loss / num_batches
     progress_bar.set_postfix(loss=f"epochs:{i}, {avg_loss:.4f}")
     if (i + 1) % 5 == 0:
-        torch.save(regrehead, f'../ckpt/{backbone}_LC2goldstein_{lr}_{epochs}.pth')
+        torch.save(regrehead, f'../ckpt/{backbone}_LC2goldstein_{lr}_{epochs}_128_4.pth')
 

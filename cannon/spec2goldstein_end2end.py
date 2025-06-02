@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-from VAESNe.regression import contrasphotoregressionHead
+from VAESNe.regression import specend2endregression
 from VAESNe.data_util import get_goldstein_params, multimodalDataset
 
 
@@ -18,18 +18,18 @@ from VAESNe.data_util import get_goldstein_params, multimodalDataset
 data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
-photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
-photoband = data['photowavelength'][training_idx,:]
+flux, wavelength, mask = data['flux'][training_idx,:], data['wavelength'][training_idx,:], data['mask'][training_idx,:]
+phase = data['phase'][training_idx]
+
 
 goldstein = data['identity'][training_idx]
 goldstein = np.array([get_goldstein_params(idd) for idd in goldstein ])
 
+flux = torch.tensor(flux, dtype=torch.float32)
+wavelength = torch.tensor(wavelength, dtype=torch.float32)
+mask = torch.tensor(mask == 0)
+phase = torch.tensor(phase, dtype=torch.float32)
 
-
-photoflux = torch.tensor(photoflux, dtype=torch.float32)
-phototime = torch.tensor(phototime, dtype=torch.float32)
-photomask = torch.tensor(photomask == 0)
-photoband = torch.tensor(photoband, dtype=torch.long)
 goldstein = torch.tensor(goldstein, dtype=torch.float32)
 
 
@@ -39,21 +39,31 @@ std = goldstein.std(dim=0)
 goldstein = (goldstein - mean)/std 
 torch.save({'mean': mean, 'std': std}, '../ckpt/goldstein_normalizing.pt')
 
-lc_dataset = TensorDataset(photoflux, phototime, photoband, photomask)
+spec_dataset = TensorDataset(flux, wavelength, phase, mask)
 goldsteinparam = TensorDataset(goldstein)
 
-dataloader = DataLoader(multimodalDataset(lc_dataset, goldsteinparam), batch_size=32, shuffle=True)
+dataloader = DataLoader(multimodalDataset(spec_dataset, goldsteinparam), batch_size=32, shuffle=True)
 
 
 ########## model ############
-backbone = "goldstein_photospectra_contrast_4-4_0.00025_500"
+lr = 2.5e-4
+epochs = 200
+latent_len = 4
+latent_dim = 4
+model_dim = 32
 
-trained_contrast = torch.load(f"../ckpt/{backbone}.pth", # trained with K=1 on iwae
-                         map_location=device, weights_only = False)
+regrehead = specend2endregression(
 
-regrehead = contrasphotoregressionHead(trained_contrast, 
-            outdim = goldstein.shape[1], 
-            MLPlatent = [128, 128, 128, 128]).to(device)
+                outdim = goldstein.shape[1],
+                 latent_len = latent_len,
+                 latent_dim = latent_dim,
+                 model_dim = model_dim, 
+                 num_heads = 4, 
+                 ff_dim = model_dim,
+                 num_layers = 4,
+                 dropout=0.1,
+                 selfattn=False,
+).to(device)
 regrehead.train()
 
 ##### optimizer ####
@@ -84,5 +94,5 @@ for i in progress_bar:
     avg_loss = total_loss / num_batches
     progress_bar.set_postfix(loss=f"epochs:{i}, {avg_loss:.4f}")
     if (i + 1) % 5 == 0:
-        torch.save(regrehead, f'../ckpt/{backbone}_LC2goldstein_{lr}_{epochs}_128_4.pth')
+        torch.save(regrehead, f'../ckpt/specend2end_{latent_len}-{latent_dim}_modeldim{model_dim}_spec2goldstein_{lr}_{epochs}.pth')
 

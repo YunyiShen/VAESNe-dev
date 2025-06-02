@@ -68,7 +68,7 @@ regrehead = photoend2endregression(
 regrehead.train()
 
 ##### optimizer ####
-lr = 2.5e-4
+lr = 1e-3
 epochs = 500
 
 optimizer = AdamW(regrehead.parameters(), lr=lr)

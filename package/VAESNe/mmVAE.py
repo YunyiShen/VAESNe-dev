@@ -69,7 +69,7 @@ class MMVAE(nn.Module):
 
 
 class photospecMMVAE(nn.Module):
-    def __init__(self, vaes, prior_dist = dist.Laplace, beta = 1.):
+    def __init__(self, vaes, prior_dist = dist.Laplace, beta = 1., length_ratio = 982/60):
         super(photospecMMVAE, self).__init__()
         self.pz = prior_dist
         self.vaes = nn.ModuleList(vaes)
@@ -81,7 +81,7 @@ class photospecMMVAE(nn.Module):
         ])
         self.vaes[0].llik_scaling = 1./beta
         self.vaes[1].llik_scaling = 1./beta
-        self.vaes[0].llik_scaling *= self.vaes[1].spectra_length / self.vaes[0].photometric_length
+        self.vaes[0].llik_scaling *= length_ratio
 
     @property
     def pz_params(self):

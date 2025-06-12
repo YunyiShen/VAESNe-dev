@@ -49,7 +49,7 @@ class SpectraEnc(nn.Module):
         return mu, var
 
 class SpectraDec(nn.Module):
-    def __init__(self, spectra_length,
+    def __init__(self, 
                  latent_dim,
                  model_dim, 
                  num_heads, 
@@ -61,7 +61,7 @@ class SpectraDec(nn.Module):
 
         # p(x|z)
         self.generativetransformer = spectraTransformerDecoder(
-                spectra_length,
+                
                  latent_dim,
                  model_dim, 
                  num_heads, 
@@ -86,7 +86,7 @@ class SpectraDec(nn.Module):
 
 
 class SpectraVAE(VAE):
-    def __init__(self, spectra_length = 982,
+    def __init__(self, 
                 latent_len = 4,
                 latent_dim = 2,
                 model_dim = 32, 
@@ -112,7 +112,7 @@ class SpectraVAE(VAE):
                     dropout,
                     selfattn
                     ),
-            SpectraDec(spectra_length,
+            SpectraDec(
                     latent_dim,
                     model_dim, 
                     num_heads, 
@@ -120,7 +120,7 @@ class SpectraVAE(VAE):
                     num_layers,
                     dropout),
             params = [
-                    spectra_length,
+                    
                     latent_len,
                     latent_dim,
                     model_dim, 
@@ -137,7 +137,7 @@ class SpectraVAE(VAE):
         ])
         self.llik_scaling = 1./beta
         self.modelName = 'spectrum'
-        self.spectra_length = spectra_length
+        
         self.latent_len = latent_len
         self.latent_dim = latent_dim
     
@@ -186,8 +186,8 @@ class SpectraVAE(VAE):
                                         phase.unsqueeze(0).expand(K, -1).reshape(-1), 
                                         zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
                                         mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
-        px_z_loc = px_z_loc.reshape(K, -1, self.spectra_length)
-        px_z_scale = px_z_scale.reshape(K, -1, self.spectra_length)
+        px_z_loc = px_z_loc.reshape(K, -1, wavelength.shape[1])
+        px_z_scale = px_z_scale.reshape(K, -1, wavelength.shape[1])
 
         return self.px_z(px_z_loc, px_z_scale)
     
@@ -205,7 +205,7 @@ class SpectraVAE(VAE):
 
 
 class BrightSpectraVAE(VAE):
-    def __init__(self, spectra_length = 982,
+    def __init__(self, 
                 latent_len = 4,
                 latent_dim = 2,
                 model_dim = 32, 
@@ -232,7 +232,7 @@ class BrightSpectraVAE(VAE):
                     dropout,
                     selfattn
                     ),
-            SpectraDec(spectra_length,
+            SpectraDec(
                     latent_dim,
                     model_dim, 
                     num_heads, 
@@ -240,7 +240,7 @@ class BrightSpectraVAE(VAE):
                     num_layers,
                     dropout),
             params = [
-                    spectra_length,
+                    
                     latent_len,
                     latent_dim,
                     model_dim, 
@@ -258,7 +258,7 @@ class BrightSpectraVAE(VAE):
         ])
         self.llik_scaling = 1./beta
         self.modelName = 'spectrum'
-        self.spectra_length = spectra_length
+        
         self.latent_len = latent_len
         self.latent_dim = latent_dim
         self.brightnessfc = MLP(latent_dim + 1, 1, [model_dim]) # phase is added
@@ -311,9 +311,9 @@ class BrightSpectraVAE(VAE):
                                         phase_expand.reshape(-1), 
                                         zs.reshape(-1, zs.shape[-2], zs.shape[-1]), 
                                         mask.unsqueeze(0).expand(K, -1, -1).reshape(-1, mask.shape[-1]))
-        px_z_loc = px_z_loc.reshape(K, -1, self.spectra_length)
+        px_z_loc = px_z_loc.reshape(K, -1, wavelength.shape[1])
         px_z_loc = px_z_loc + brightness - px_z_loc.mean(axis = 2)[:, :, None] 
-        px_z_scale = px_z_scale.reshape(K, -1, self.spectra_length)
+        px_z_scale = px_z_scale.reshape(K, -1, wavelength.shape[1])
 
         return self.px_z(px_z_loc, px_z_scale)
     

@@ -71,7 +71,8 @@ class spectraTransformerEncoder(nn.Module):
                  num_layers,
                  ff_dim, 
                  dropout = 0.1, 
-                 selfattn = False):
+                 selfattn = False, 
+                 concat = True):
         '''
         Transformer encoder for spectra, with cross attention pooling
         Args:
@@ -89,14 +90,24 @@ class spectraTransformerEncoder(nn.Module):
         super(spectraTransformerEncoder, self).__init__()
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
         
-        self.phase_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand phase to bottleneck
-        self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand wavelength to bottleneck
+        
+        
         self.flux_embd = nn.Linear(1, model_dim)
         self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
                                                     num_heads, ff_dim, dropout, selfattn) 
                                                  for _ in range(num_layers)] )
         
         self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
+        self.concat = concat
+        if concat:
+            self.spectrafc = MLP(2*model_dim, model_dim, [model_dim])
+            self.wavelength_embd_layer = SinusoidalPositionalEmbedding(model_dim)# expand phase to bottleneck
+
+        else:
+            self.spectrafc = None
+            self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand phase to bottleneck
+        self.phase_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand phase to bottleneck
+
 
     def forward(self, wavelength, flux, phase, mask=None):
         '''
@@ -108,8 +119,11 @@ class spectraTransformerEncoder(nn.Module):
         Return:
             Encoded spectra of shape [batch_size, bottleneck_length, bottleneck_dim]
         '''
-        
-        flux_embd = self.flux_embd(flux[:, :, None]) + self.wavelength_embd_layer(wavelength)
+        if self.concat:
+            flux_embd = self.spectrafc(torch.cat([ self.flux_embd(flux[:, :, None]), self.wavelength_embd_layer(wavelength)], axis = -1))
+        else:
+
+            flux_embd = self.flux_embd(flux[:, :, None]) + self.wavelength_embd_layer(wavelength)
         phase_embd = self.phase_embd_layer(phase[:, None])
         context = torch.cat([flux_embd, phase_embd], dim=1) # concatenate flux and phase embd
         if mask is not None:

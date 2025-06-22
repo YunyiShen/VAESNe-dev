@@ -17,7 +17,8 @@ class SpectraEnc(nn.Module):
                 num_layers,
                 ff_dim, 
                 dropout=0.1,
-                selfattn = False):
+                selfattn = False,
+                concat = True):
         super(SpectraEnc, self).__init__()
 
         # q(y|x) and q(z|y,x) before GumbelSoftmax and Gaussian
@@ -29,7 +30,8 @@ class SpectraEnc(nn.Module):
                  num_layers,
                  ff_dim, 
                  dropout,
-                 selfattn
+                 selfattn,
+                 concat
                  )
         self.latent_dim = latent_dim
         self.latent_len = latent_len
@@ -95,6 +97,7 @@ class SpectraVAE(VAE):
                 num_layers = 4,
                 dropout = 0.1,
                 selfattn = False,
+                concat = True,
                 beta = 1.,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
@@ -110,7 +113,8 @@ class SpectraVAE(VAE):
                     num_layers,
                     ff_dim, 
                     dropout,
-                    selfattn
+                    selfattn,
+                    concat
                     ),
             SpectraDec(
                     latent_dim,

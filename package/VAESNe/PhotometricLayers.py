@@ -79,7 +79,8 @@ class photometricTransformerEncoder(nn.Module):
                  ff_dim = 32,
                  num_layers = 4,
                  dropout=0.1,
-                 selfattn=False):
+                 selfattn=False, 
+                 concat = True):
         '''
         Transformer encoder for photometry, with cross attention pooling
         Args:
@@ -96,15 +97,21 @@ class photometricTransformerEncoder(nn.Module):
         '''
         super(photometricTransformerEncoder, self).__init__()
         self.model_dim = model_dim
-        self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+        
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
         self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
         self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
                                                     num_heads, ff_dim, dropout, selfattn) 
                                                  for _ in range(num_layers)] )
-        
+        self.concat = concat
         self.bandembd = nn.Embedding(num_bands, model_dim)
         self.fluxfc = nn.Linear(1, model_dim)
+        if concat:
+            self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+            self.LCfc = MLP(3*model_dim, model_dim, [model_dim])
+        else:
+            self.time_embd = SinusoidalPositionalEmbedding(model_dim)
+            self.LCfc = None
 
 
     def forward(self, flux, time, band, mask=None):
@@ -117,7 +124,13 @@ class photometricTransformerEncoder(nn.Module):
             encoding of size [batch_size, bottleneck_length, bottleneck_dim]
 
         '''
-        photomety_embdding = (self.fluxfc(flux[:, :, None]) + 
+        if self.concat:
+            photomety_embdding = self.LCfc(torch.cat([self.fluxfc(flux[:, :, None]) , 
+                              self.time_embd(time),  
+                              self.bandembd(band)], axis = -1))
+        
+        else:
+            photomety_embdding = (self.fluxfc(flux[:, :, None]) + 
                               self.time_embd(time) + 
                               self.bandembd(band))
 

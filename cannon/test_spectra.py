@@ -56,21 +56,23 @@ val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True, pin_memory=Tru
 
 lr = 2.5e-4
 epochs = 200
+concat = True
 
 my_vaesne = SpectraVAE(
     # data parameters
-    spectra_length = 982,
+    #spectra_length = 982,
 
     # model parameters
     latent_len = 4,
-    latent_dim = 2,
+    latent_dim = 4,
     model_dim = 32, 
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
     selfattn = False,
-    beta = 0.5
+    beta = 1.,
+    concat = concat
     #True
     ).to(device)
 
@@ -89,7 +91,7 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_spec.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/goldstein_specvaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(my_vaesne, f'../ckpt/goldstein_specvaesne_4-4_{lr}_{epochs}_concat{concat}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 
 

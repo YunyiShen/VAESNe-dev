@@ -90,17 +90,18 @@ photo_spect_train = multimodalDataset(photometric_train_dataset,
 train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
 #val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 
-lr = 2.5e-4
+lr = 1e-4
 epochs = 200
 K=2
 latent_len = 4
 latent_dim = 4
-beta = 0.5
+beta = 1.0
 model_dim = 32
+concat = True
 
 my_spectravae = SpectraVAE(
     # data parameters
-    spectra_length = flux.shape[1],
+    #spectra_length = flux.shape[1],
 
     # model parameters
     latent_len = latent_len,
@@ -110,11 +111,12 @@ my_spectravae = SpectraVAE(
     ff_dim = model_dim, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = False #True
+    selfattn = False, #True
+    concat = concat
     ).to(device)
 
 my_photovae = PhotometricVAE(
-    photometric_length = photoflux.shape[1],
+    #photometric_length = photoflux.shape[1],
     num_bands = 6,
     # model parameters
     latent_len = latent_len,
@@ -124,7 +126,8 @@ my_photovae = PhotometricVAE(
     ff_dim = model_dim, 
     num_layers = 4,
     dropout = 0.1,
-    selfattn = False #True
+    selfattn = False, #True
+    concat = concat
     ).to(device)
 
 my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae], beta = beta).to(device)
@@ -147,5 +150,5 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/goldstein_training_specphoto.png")
         plt.close()
-        torch.save(my_mmvae, f'../ckpt/goldstein_photospectravaesne_{latent_len}-{latent_dim}_{lr}_{epochs}_K{K}_beta{beta}_modeldim{model_dim}.pth')
+        torch.save(my_mmvae, f'../ckpt/goldstein_photospectravaesne_{latent_len}-{latent_dim}_{lr}_{epochs}_K{K}_beta{beta}_modeldim{model_dim}_concat{concat}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")

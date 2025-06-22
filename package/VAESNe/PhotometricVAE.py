@@ -17,7 +17,8 @@ class PhotometricEnc(nn.Module):
                 ff_dim, 
                 num_layers,
                 dropout=0.1,
-                selfattn = False
+                selfattn = False,
+                concat = True
                 ):
         super(PhotometricEnc, self).__init__()
 
@@ -30,7 +31,8 @@ class PhotometricEnc(nn.Module):
                                  ff_dim, 
                                  num_layers,
                                  dropout,
-                                 selfattn
+                                 selfattn,
+                                 concat
                                  )
         self.latent_dim = latent_dim
         self.latent_len = latent_len
@@ -103,6 +105,7 @@ class PhotometricVAE(VAE):
                 num_layers = 4,
                 dropout = 0.1,
                 selfattn = False,
+                concat = True,
                 beta = 1.,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
@@ -120,7 +123,7 @@ class PhotometricVAE(VAE):
                 ff_dim, 
                 num_layers,
                 dropout,
-                selfattn),
+                selfattn, concat),
             PhotometricDec(
                  latent_dim,
                 num_bands,

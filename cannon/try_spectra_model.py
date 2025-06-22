@@ -19,27 +19,29 @@ flux_test, wavelength_test, mask_test = data['flux'][testing_idx], data['wavelen
 phase_test = data['phase'][testing_idx]
 
 
-idx = 17
+idx = 204
 
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
 mask_test = torch.tensor(mask_test == 0)
 phase_test = torch.tensor(phase_test, dtype=torch.float32)
 
-trained_vae = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
+trained_vae = torch.load('../ckpt/goldstein_specvaesne_4-4_0.00025_200_concatTrue.pth',
                          map_location=torch.device('cpu'), weights_only = False)
 
 #breakpoint()
 reconstruction = trained_vae.reconstruct((flux_test[idx][None,:],
                                          wavelength_test[idx][None,:],
                                             phase_test[idx][None],
-                                            mask_test[idx][None,:]))
+                                            mask_test[idx][None,:]), K = 30)
 
 
 import matplotlib.pyplot as plt
 fig, axs = plt.subplots(1, 1, figsize=(10, 5))
 axs.plot(wavelength_test[idx], flux_test[idx], label='ground truth')
-axs.plot(wavelength_test[idx], reconstruction[0].detach().numpy(), label='reconstruction')
+for i in range(30):
+
+   axs.plot(wavelength_test[idx], reconstruction[i, 0].detach().numpy())
 
 
 

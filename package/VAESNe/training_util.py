@@ -30,10 +30,13 @@ def training_step(network, optimizer, data_loader,
         average of all loss values, accuracy, nmi
     """
     network.train()
+    print("trainh here")
     total_loss = 0.
     num_batches = 0.
     device = next(network.parameters()).device
+    print(len(data_loader), "batches in this epoch")
     for x in data_loader: # flux, time, band, mask for photometry and flux, wavelength, phase, mask for spectra
+        print("trainh here2")
         optimizer.zero_grad()
         if multimodal:
             x = [tuple(_x.to(device) for _x in modality) for modality in x]

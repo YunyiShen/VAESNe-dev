@@ -6,6 +6,7 @@ import numpy as np
 # optimizer
 from torch.optim import AdamW
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print("Using device:", device)
 from matplotlib import pyplot as plt
 
 
@@ -19,7 +20,9 @@ from VAESNe.mmVAE import photospecMMVAE
 torch.manual_seed(0)
 
 ### dataset ###
-data = np.load("../data/train_data_align_with_simu_minimal.npz")
+# data = np.load("../data/train_data_align_with_simu_minimal.npz")
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_trunc15_phase.npz")
+# data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/VAESNe-dev/data/train_data_align_with_simu_minimal.npz")
 
 ### spectra ###
 flux, wavelength, mask = data['flux'], data['wavelength'], data['mask']
@@ -39,6 +42,9 @@ photoflux = torch.tensor(photoflux, dtype=torch.float32)
 phototime = torch.tensor(phototime, dtype=torch.float32)
 photomask = torch.tensor(photomask == 0)
 photoband = torch.tensor(photoband, dtype=torch.long)
+
+num_bands = int(photoband.max().item() + 1)
+print("num_bands:", num_bands)
 #breakpoint()
 
 #### augmentation ####
@@ -73,7 +79,8 @@ photometric_train_dataset = TensorDataset(photoflux, phototime, photoband, photo
 photo_spect_train = multimodalDataset(photometric_train_dataset, 
                 spectra_train_dataset)
 
-train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
+# train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
+train_loader = DataLoader(photo_spect_train, batch_size=4, shuffle=True)  # Use batch size 4 if using the real data, otherwise wiill run out of memory
 
 lr = 1e-3 #2.5e-4
 epochs = 200
@@ -86,7 +93,7 @@ num_layers = 4
 
 my_spectravae = SpectraVAE(
     # data parameters
-    spectra_length = flux.shape[1],
+    # spectra_length = flux.shape[1],  # This parameter doesn't exist in SpectraVAE class
 
     # model parameters
     latent_len = latent_len,
@@ -101,8 +108,8 @@ my_spectravae = SpectraVAE(
 
 
 my_photovae = PhotometricVAE(
-    photometric_length = photoflux.shape[1],
-    num_bands = 2,
+    # photometric_length = photoflux.shape[1],  # This parameter doesn't exist in PhotometricVAE class
+    num_bands = num_bands,  # 2 (this leads to index out of range error)
     # model parameters
     latent_len = latent_len,
     latent_dim = latent_dim,

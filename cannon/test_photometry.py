@@ -16,7 +16,8 @@ from VAESNe.losses import elbo
 
 
 
-data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+# data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
 photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
@@ -55,18 +56,18 @@ val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
 lr = 2.5e-4
 epochs = 200
 my_vaesne = PhotometricVAE(
-    photometric_length = 60,
+    # photometric_length = 60,
     num_bands = 6,
     # model parameters
     latent_len = 4,
-    latent_dim = 2,
+    latent_dim = 4,
     model_dim = 32, 
     num_heads = 4, 
     ff_dim = 32, 
     num_layers = 4,
     dropout = 0.1,
     selfattn = False,#True
-    beta = 0.5
+    beta = 1.  # 0.5
     ).to(device)
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)
@@ -82,6 +83,6 @@ for i in progress_bar:
         plt.show()
         plt.savefig("./logs/training_photometry.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-2_{lr}_{epochs}.pth')
+        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-4_{lr}_{epochs}.pth')
     progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
 

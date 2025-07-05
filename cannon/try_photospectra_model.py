@@ -7,13 +7,19 @@ import numpy as np
 from torch.optim import Adam
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-
 from VAESNe.mmVAE import photospecMMVAE
 
 
-data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+# data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
+
+# Check if reconstructed spectra are sampled along the same wavelength grid as the training spectra
+# w = data['wavelength']  # shape [num_spectra, N_waves]
+# first = w[0]  # the first grid (row)
+# all_same = np.allclose(w, first[None, :])  # check if every row matches the first
+# print("All wavelength grids identical?", all_same)
 
 flux_test, wavelength_test, mask_test = data['flux'][testing_idx], data['wavelength'][testing_idx], data['mask'][testing_idx]
 phase_test = data['phase'][testing_idx]
@@ -28,7 +34,6 @@ phase_mean, phase_std = data['phase_mean'], data['phase_std']
 phototime_mean, phototime_std = data['phototime_mean'], data['phototime_std']
 photoflux_mean, photoflux_std = data['photoflux_mean'], data['photoflux_std']
 
-
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
 mask_test = torch.tensor(mask_test == 0)
@@ -42,13 +47,19 @@ photomask_test = torch.tensor(photomask_test == 0)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
-trained_vae = torch.load("../ckpt/goldstein_brightphotospectravaesne_4-4_0.001_500_K8_beta1.0_modeldim32.pth", # trained with K=1 on iwae
+# trained_vae = torch.load("../ckpt/goldstein_brightphotospectravaesne_4-4_0.001_500_K8_beta1.0_modeldim32.pth", # trained with K=1 on iwae
+#                          map_location=torch.device('cpu'), weights_only = False)
+trained_vae = torch.load("../ckpt/goldstein_photospectravaesne_4-4_0.0001_200_K2_beta1.0_modeldim32_concatTrue.pth", # trained with K=1 on iwae
                          map_location=torch.device('cpu'), weights_only = False)
 
-photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
+# photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
+#                          map_location=torch.device('cpu'), weights_only = False)
+photo_only = torch.load("../ckpt/goldstein_photovaesne_4-4_0.00025_200.pth",
                          map_location=torch.device('cpu'), weights_only = False)
 
-spectra_only = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
+# spectra_only = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
+#                          map_location=torch.device('cpu'), weights_only = False)
+spectra_only = torch.load('../ckpt/goldstein_specvaesne_4-4_0.00025_200_concatTrue.pth',
                          map_location=torch.device('cpu'), weights_only = False)
 
 trained_vae.eval()
@@ -83,8 +94,6 @@ with torch.no_grad():
     spectra_encoded = spectra_only.encode(data[1])[None, ...]
     photo_encode_spec_decode = spectra_only.decode(photo_encode, data[1]).mean
     spec_encode_photo_decode = photo_only.decode(spectra_encoded, data[0]).mean
-
-
 
 
 import matplotlib.pyplot as plt
@@ -169,7 +178,7 @@ axs[4].set_title("cross model")
 #plt.tight_layout()
 
 plt.show()
-plt.savefig("LC_reconstruction.pdf")
+plt.savefig("LC_reconstruction.png")
 plt.close()
 
 
@@ -248,7 +257,7 @@ axs[0].set_title(f"spectra at phase {thisphase}")
 #plt.tight_layout()
 
 plt.show()
-plt.savefig("spectra_reconstruction.pdf")
+plt.savefig("spectra_reconstruction.png")
 plt.close()
 
 
@@ -269,5 +278,5 @@ axs.set_xlabel("wavelength (Å)")
 axs.set_ylim(-2* flux_std + flux_mean, 
               2* flux_std + flux_mean)
 plt.show()
-plt.savefig("spectra_priorsamples.pdf")
+plt.savefig("spectra_priorsamples.png")
 plt.close()

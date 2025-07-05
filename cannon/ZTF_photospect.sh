@@ -11,7 +11,6 @@
 #SBATCH --mail-user=wendysun@mit.edu
 
 module load python/3.10.13-fasrc01
-# source activate torch
 source activate /n/holystore01/LABS/iaifi_lab/Lab/qinyisun/conda/envs/vae_env
 
 python ZTF_photospect.py

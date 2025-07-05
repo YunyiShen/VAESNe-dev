@@ -7,7 +7,7 @@ import numpy as np
 from torch.optim import AdamW
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 from matplotlib import pyplot as plt
-
+import os
 
 from VAESNe.SpectraVAE import BrightSpectraVAE, SpectraVAE
 from VAESNe.PhotometricVAE import BrightPhotometricVAE, PhotometricVAE
@@ -19,7 +19,8 @@ from VAESNe.mmVAE import photospecMMVAE
 torch.manual_seed(0)
 
 
-data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+# data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
 
@@ -135,6 +136,10 @@ my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae], beta = beta).to(d
 optimizer = AdamW(my_mmvae.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan
 steps = np.arange(epochs)
+
+# Make log & checkpoint directories if they don't exist
+os.makedirs("./logs", exist_ok=True)
+os.makedirs("../ckpt", exist_ok=True)
 
 from tqdm import tqdm
 progress_bar = tqdm(range(epochs))

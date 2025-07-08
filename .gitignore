@@ -136,6 +136,7 @@ tests/
 cannon/logs
 *.npz
 cannon/data
+data/
 cannon/test/*/*.npz
 *.out
 *.err

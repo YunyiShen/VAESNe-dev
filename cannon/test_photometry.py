@@ -11,30 +11,45 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 from VAESNe.PhotometricVAE import PhotometricVAE
-from VAESNe.training_util import training_step
+from VAESNe.training_util import training_step, validation_step
 from VAESNe.losses import elbo
 
 
 
 # data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
-data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+# data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/qinyisun/VAESNe-dev/data/dataset_full.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
-photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
+
+# Only Type Ia supernova
+sntypes = data['sntype']
+target_type = "SALT3.P2"
+mask = (sntypes == target_type)
+training_idx = np.intersect1d(training_idx, np.where(mask)[0])
+testing_idx  = np.intersect1d(testing_idx, np.where(mask)[0])
+
+# randomly select a subset for training
+training_idx = np.random.choice(training_idx, 1000, replace=False)
+# testing_idx = np.random.choice(testing_idx, 2000, replace=False)
+
+# photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
+photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['photophase'][training_idx,:], data['photomask'][training_idx,:]
 photoband = data['photowavelength'][training_idx,:]
 
-photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+# photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['photophase'][testing_idx], data['photomask'][testing_idx]
 photoband_test = data['photowavelength'][testing_idx]
 
 
 photoflux = torch.tensor(photoflux, dtype=torch.float32)
 phototime = torch.tensor(phototime, dtype=torch.float32)
-photomask = torch.tensor(photomask == 0)
+photomask = torch.tensor(photomask == 1)
 photoband = torch.tensor(photoband, dtype=torch.long)
 
 photoflux_test = torch.tensor(photo_flux_test, dtype=torch.float32)
 phototime_test = torch.tensor(phototime_test, dtype=torch.float32)
-photomask_test = torch.tensor(photomask_test == 0)
+photomask_test = torch.tensor(photomask_test == 1)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
@@ -72,17 +87,23 @@ my_vaesne = PhotometricVAE(
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan
+all_val_losses = np.ones(epochs) + np.nan
 steps = np.arange(epochs)
 from tqdm import tqdm
 progress_bar = tqdm(range(epochs))
 for i in progress_bar:
     loss = training_step(my_vaesne, optimizer, train_loader, elbo)
     all_losses[i] = loss
+    val_loss = validation_step(my_vaesne, val_loader, elbo)
+    all_val_losses[i] = val_loss
     if (i + 1) % 5 == 0:
-        plt.plot(steps, all_losses)
+        plt.plot(steps, all_losses, label='Training Loss')
+        plt.plot(steps, all_val_losses, label='Validation Loss')
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
         plt.show()
         plt.savefig("./logs/training_photometry.png")
         plt.close()
-        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-4_{lr}_{epochs}.pth')
-    progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
-
+        torch.save(my_vaesne, f'../ckpt/goldstein_photovaesne_4-4_{lr}_{epochs}_dim256.pth')
+    progress_bar.set_postfix(loss=f"epochs: {i}, train_loss: {loss:.4f}, val_loss: {val_loss:.4f}")

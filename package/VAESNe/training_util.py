@@ -52,3 +52,27 @@ def training_step(network, optimizer, data_loader,
             torch.cuda.empty_cache()
 
     return total_loss / num_batches
+
+
+def validation_step(network, data_loader, loss_fn=elbo, multimodal=False):
+    """Evaluate the model on validation data
+    
+    Returns:
+        average validation loss
+    """
+    network.eval()
+    total_loss = 0.
+    num_batches = 0.
+    device = next(network.parameters()).device
+    
+    with torch.no_grad():
+        for x in data_loader:
+            if multimodal:
+                x = [tuple(_x.to(device) for _x in modality) for modality in x]
+            else:
+                x = tuple(_x.to(device) for _x in x)
+            loss = -loss_fn(network, x)
+            total_loss += loss.detach().cpu().item()
+            num_batches += 1.
+    
+    return total_loss / num_batches

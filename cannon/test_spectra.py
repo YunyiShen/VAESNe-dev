@@ -10,17 +10,28 @@ from matplotlib import pyplot as plt
 
 
 from VAESNe.SpectraVAE import SpectraVAE
-from VAESNe.training_util import training_step
+from VAESNe.training_util import training_step, validation_step
 from VAESNe.losses import elbo
 
 torch.manual_seed(0)
 
 
 # data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
-data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+# data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/qinyisun/VAESNe-dev/data/dataset_full.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
 
+# Only Type Ia supernova
+sntypes = data['sntype']
+target_type = "SALT3.P2"
+mask = (sntypes == target_type)
+training_idx = np.intersect1d(training_idx, np.where(mask)[0])
+testing_idx  = np.intersect1d(testing_idx, np.where(mask)[0])
+
+# randomly select a subset for training
+training_idx = np.random.choice(training_idx, 1000, replace=False)
+# testing_idx = np.random.choice(testing_idx, 2000, replace=False)
 
 flux, wavelength, mask = data['flux'][training_idx,:], data['wavelength'][training_idx,:], data['mask'][training_idx,:]
 phase = data['phase'][training_idx]
@@ -31,12 +42,12 @@ phase_test = data['phase'][testing_idx]
 
 flux = torch.tensor(flux, dtype=torch.float32)
 wavelength = torch.tensor(wavelength, dtype=torch.float32)
-mask = torch.tensor(mask == 0)
+mask = torch.tensor(mask == 1)
 phase = torch.tensor(phase, dtype=torch.float32)
 
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
-mask_test = torch.tensor(mask_test == 0)
+mask_test = torch.tensor(mask_test == 1)
 phase_test = torch.tensor(phase_test, dtype=torch.float32)
 
 # do some data augmentation on flux and time, the data is already repeated multiple times 
@@ -79,20 +90,24 @@ my_vaesne = SpectraVAE(
 
 optimizer = AdamW(my_vaesne.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan
+all_val_losses = np.ones(epochs) + np.nan
 steps = np.arange(epochs)
-
 
 from tqdm import tqdm
 progress_bar = tqdm(range(epochs))
 for i in progress_bar:
     loss = training_step(my_vaesne, optimizer, train_loader, elbo)
     all_losses[i] = loss
+    val_loss = validation_step(my_vaesne, val_loader, elbo)
+    all_val_losses[i] = val_loss
     if (i + 1) % 5 == 0:
-        plt.plot(steps, all_losses)
+        plt.plot(steps, all_losses, label='Training Loss')
+        plt.plot(steps, all_val_losses, label='Validation Loss')
+        plt.legend()
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
         plt.show()
         plt.savefig("./logs/training_spec.png")
         plt.close()
         torch.save(my_vaesne, f'../ckpt/goldstein_specvaesne_4-4_{lr}_{epochs}_concat{concat}.pth')
-    progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
-
-
+    progress_bar.set_postfix(loss=f"epochs: {i}, train_loss: {loss:.4f}, val_loss: {val_loss:.4f}")

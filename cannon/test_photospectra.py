@@ -11,7 +11,7 @@ import os
 
 from VAESNe.SpectraVAE import BrightSpectraVAE, SpectraVAE
 from VAESNe.PhotometricVAE import BrightPhotometricVAE, PhotometricVAE
-from VAESNe.training_util import training_step
+from VAESNe.training_util import training_step, validation_step
 from VAESNe.losses import elbo, m_iwae, _m_iwae
 from VAESNe.data_util import multimodalDataset
 from VAESNe.mmVAE import photospecMMVAE
@@ -20,9 +20,21 @@ torch.manual_seed(0)
 
 
 # data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
-data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+# data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/qinyisun/VAESNe-dev/data/dataset_full.npz")
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
+
+# Only Type Ia supernova
+sntypes = data['sntype']
+target_type = "SALT3.P2"
+mask = (sntypes == target_type)
+training_idx = np.intersect1d(training_idx, np.where(mask)[0])
+testing_idx  = np.intersect1d(testing_idx, np.where(mask)[0])
+
+# randomly select a subset for training
+training_idx = np.random.choice(training_idx, 1000, replace=False)
+# testing_idx = np.random.choice(testing_idx, 2000, replace=False)
 
 ######## spectra dataset #######
 flux, wavelength, mask = data['flux'][training_idx,:], data['wavelength'][training_idx,:], data['mask'][training_idx,:]
@@ -31,15 +43,14 @@ phase = data['phase'][training_idx]
 flux_test, wavelength_test, mask_test = data['flux'][testing_idx], data['wavelength'][testing_idx], data['mask'][testing_idx]
 phase_test = data['phase'][testing_idx]
 
-
 flux = torch.tensor(flux, dtype=torch.float32)
 wavelength = torch.tensor(wavelength, dtype=torch.float32)
-mask = torch.tensor(mask == 0)
+mask = torch.tensor(mask == 1)
 phase = torch.tensor(phase, dtype=torch.float32)
 
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
-mask_test = torch.tensor(mask_test == 0)
+mask_test = torch.tensor(mask_test == 1)
 phase_test = torch.tensor(phase_test, dtype=torch.float32)
 
 # do some data augmentation on flux and time, the data is already repeated multiple times 
@@ -54,21 +65,23 @@ spectra_test_dataset = TensorDataset(flux_test, wavelength_test, phase_test, mas
 spectra_test_dataset, spectra_val_dataset = random_split(spectra_test_dataset, [0.5, 0.5])
 
 ########### photometry #######
-photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
+# photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['phototime'][training_idx,:], data['photomask'][training_idx,:]
+photoflux, phototime, photomask = data['photoflux'][training_idx,:], data['photophase'][training_idx,:], data['photomask'][training_idx,:]
 photoband = data['photowavelength'][training_idx,:]
 
-photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+# photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['photophase'][testing_idx], data['photomask'][testing_idx]
 photoband_test = data['photowavelength'][testing_idx]
 
 
 photoflux = torch.tensor(photoflux, dtype=torch.float32)
 phototime = torch.tensor(phototime, dtype=torch.float32)
-photomask = torch.tensor(photomask == 0)
+photomask = torch.tensor(photomask == 1)
 photoband = torch.tensor(photoband, dtype=torch.long)
 
 photoflux_test = torch.tensor(photo_flux_test, dtype=torch.float32)
 phototime_test = torch.tensor(phototime_test, dtype=torch.float32)
-photomask_test = torch.tensor(photomask_test == 0)
+photomask_test = torch.tensor(photomask_test == 1)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
@@ -84,12 +97,11 @@ photometric_train_dataset = TensorDataset(photoflux, phototime, photoband, photo
 photometric_test_dataset = TensorDataset(photoflux_test, phototime_test, photoband_test, photomask_test)
 photometric_test_dataset, photometric_val_dataset = random_split(photometric_test_dataset, [0.5, 0.5])
 
+photo_spect_train = multimodalDataset(photometric_train_dataset, spectra_train_dataset)
+photo_spect_val = multimodalDataset(photometric_val_dataset, spectra_val_dataset)
 
-photo_spect_train = multimodalDataset(photometric_train_dataset, 
-                spectra_train_dataset)
-
-train_loader = DataLoader(photo_spect_train, batch_size=16, shuffle=True)
-#val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
+train_loader = DataLoader(photo_spect_train, batch_size=32, shuffle=True)
+val_loader = DataLoader(photo_spect_val, batch_size=32, shuffle=True)
 
 lr = 1e-4
 epochs = 200
@@ -135,6 +147,7 @@ my_mmvae = photospecMMVAE(vaes = [my_photovae, my_spectravae], beta = beta).to(d
 
 optimizer = AdamW(my_mmvae.parameters(), lr=lr)
 all_losses = np.ones(epochs) + np.nan
+all_val_losses = np.ones(epochs) + np.nan
 steps = np.arange(epochs)
 
 # Make log & checkpoint directories if they don't exist
@@ -144,16 +157,22 @@ os.makedirs("../ckpt", exist_ok=True)
 from tqdm import tqdm
 progress_bar = tqdm(range(epochs))
 for i in progress_bar:
-    loss = training_step(my_mmvae, optimizer,train_loader, 
-                    loss_fn = lambda model, x: m_iwae(model, x, K=K), 
-                    multimodal = True)
+    loss = training_step(my_mmvae, optimizer, train_loader, 
+                         loss_fn = lambda model, x: m_iwae(model, x, K=K), 
+                         multimodal = True)
     all_losses[i] = loss
+    val_loss = validation_step(my_mmvae, val_loader, 
+                                loss_fn = lambda model, x: m_iwae(model, x, K=K), 
+                                multimodal = True)
+    all_val_losses[i] = val_loss
     if (i + 1) % 5 == 0:
-        plt.plot(steps, all_losses)
-        plt.xlabel("training epochs")
-        plt.ylabel("loss")
+        plt.plot(steps, all_losses, label='Training Loss')
+        plt.plot(steps, all_val_losses, label='Validation Loss')
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
         plt.show()
         plt.savefig("./logs/goldstein_training_specphoto.png")
         plt.close()
         torch.save(my_mmvae, f'../ckpt/goldstein_photospectravaesne_{latent_len}-{latent_dim}_{lr}_{epochs}_K{K}_beta{beta}_modeldim{model_dim}_concat{concat}.pth')
-    progress_bar.set_postfix(loss=f"epochs:{i}, {loss:.4f}")
+    progress_bar.set_postfix(loss=f"epochs: {i}, train_loss: {loss:.4f}, val_loss: {val_loss:.4f}")

@@ -106,16 +106,21 @@ class PhotoSpecData:
                     wave = 0.5 * (spec_flux_table['LAMMIN'][w0:w1] + spec_flux_table['LAMMAX'][w0:w1])
                     rawf = spec_flux_table['FLAM'][w0:w1]
                     flux_err = spec_flux_table['FLAMERR'][w0:w1]
-                    # keep only finite flux and wavelength within a range
-                    valid = np.where(np.isfinite(rawf) & (3500 <= wave) & (wave <= 10000))[0]
-                    if valid.size < 20:  # skip if too few valid points
-                        continue
 
-                    sw = wave[valid]
-                    sf = rawf[valid].copy()
                     # filter by signal-to-noise ratio > 4, remove negative fluxes
-                    snr_spec_mask = (np.isfinite(sf) & np.isfinite(flux_err[valid]) & (np.abs(sf/flux_err[valid]) > 4.0) & (sf > 0))
-                    sf, sw = sf[snr_spec_mask], sw[snr_spec_mask]
+                    snr_spec_mask = (np.isfinite(rawf) & np.isfinite(flux_err) & (np.abs(rawf/flux_err) > 4.0) & (rawf > 0))
+                    # keep only finite flux and wavelength within a range
+                    qual_mask = np.isfinite(wave) & (3500 <= wave) & (wave <= 10000)
+                    final_mask = snr_spec_mask & qual_mask
+                    if final_mask.sum() < 100:  # skip if too few valid points
+                        continue
+                    sf, sw = rawf[final_mask], wave[final_mask]
+
+                    # Sort wavelength grid
+                    # wavelength_idx = np.argsort(sw)
+                    # sw = sw[wavelength_idx]
+                    # sf = sf[wavelength_idx]
+
                     sf = np.log10(sf)  # flux in log scale
                     sf = medfilt(sf, self.midfiltsize)  # median filter
                     if self.centering:
@@ -181,6 +186,14 @@ if __name__=='__main__':
     loader = PhotoSpecData(data_dir='train_dash_spec', centering=False, standardize=False)
     sw, sf, sm, sp, pf, pm, pw, pph, snid, sntype, z_helio, z_helio_errors, z_final, z_final_errors = loader.load_data()
 
+    # --- Check if each wavelength row is sorted ---
+    for i in range(sw.shape[0]):
+        # only check valid (unmasked) entries
+        valid = (sm[i] == 0)
+        wav = sw[i, valid]
+        if not np.all(np.diff(wav) > 0):
+            print(f"[WARNING] Spectrum {i} has non-increasing wavelength values")
+
     # get train / test splits
     D = sf.shape[0]
     train_idx = np.random.choice(D, int(0.8 * D), replace=False)
@@ -235,10 +248,10 @@ if __name__=='__main__':
             print(f"  {key} value: {arr}")
     
     # breakdown of data points per SN type
-    # unique_types, counts = np.unique(sntype, return_counts=True)
-    # print("\nDatapoints per SN type:")
-    # for typ, cnt in zip(unique_types, counts):
-    #     print(f"{typ}: {cnt}")
+    unique_types, counts = np.unique(sntype, return_counts=True)
+    print("\nDatapoints per SN type:")
+    for typ, cnt in zip(unique_types, counts):
+        print(f"{typ}: {cnt}")
 
     # train_types, train_counts = np.unique(sntype[train_idx], return_counts=True)
     # print("\nTraining-set datapoints per SN type:")

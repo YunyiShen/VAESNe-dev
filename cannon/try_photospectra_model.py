@@ -15,9 +15,24 @@ from VAESNe.mmVAE import photospecMMVAE
 
 
 # data = np.load('../data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz')
-data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+# data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/specgen_shen_gagliano/generative-spectra-lightcurves/data/goldstein_processed/preprocessed_midfilt_3_centeringFalse_realisticLSST_phase.npz")
+data = np.load("/n/holystore01/LABS/iaifi_lab/Lab/qinyisun/VAESNe-dev/data/dataset_full.npz")
+
 training_idx = data['training_idx']
 testing_idx = data['testing_idx']
+
+# Only Type Ia supernova
+sntypes = data['sntype']
+target_type = "SNIax"
+mask = (sntypes == target_type)
+training_idx = np.intersect1d(training_idx, np.where(mask)[0])
+testing_idx  = np.intersect1d(testing_idx, np.where(mask)[0])
+
+# randomly select 10000 for training and 2000 for testing
+training_idx = np.random.choice(training_idx, 1000, replace=False)
+testing_idx = np.random.choice(testing_idx, 200, replace=False)
+
+
 # print length of testing_idx
 print("Number of testing spectra:", len(testing_idx))
 
@@ -30,26 +45,27 @@ print("Number of testing spectra:", len(testing_idx))
 flux_test, wavelength_test, mask_test = data['flux'][testing_idx], data['wavelength'][testing_idx], data['mask'][testing_idx]
 phase_test = data['phase'][testing_idx]
 
-photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+# photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['phototime'][testing_idx], data['photomask'][testing_idx]
+photo_flux_test, phototime_test, photomask_test = data['photoflux'][testing_idx], data['photophase'][testing_idx], data['photomask'][testing_idx]
 photoband_test = data['photowavelength'][testing_idx]
 
 flux_mean, flux_std = data['flux_mean'], data['flux_std']
 wavelength_mean, wavelength_std = data['wavelength_mean'], data['wavelength_std']
 phase_mean, phase_std = data['phase_mean'], data['phase_std']
 
-phototime_mean, phototime_std = data['phototime_mean'], data['phototime_std']
+# phototime_mean, phototime_std = data['phototime_mean'], data['phototime_std']
+phototime_mean, phototime_std = data['photophase_mean'], data['photophase_std']
 photoflux_mean, photoflux_std = data['photoflux_mean'], data['photoflux_std']
 
 flux_test = torch.tensor(flux_test, dtype=torch.float32)
 wavelength_test = torch.tensor(wavelength_test, dtype=torch.float32)
-mask_test = torch.tensor(mask_test == 0)
+mask_test = torch.tensor(mask_test == 1)
 phase_test = torch.tensor(phase_test, dtype=torch.float32)
-
 
 
 photoflux_test = torch.tensor(photo_flux_test, dtype=torch.float32)
 phototime_test = torch.tensor(phototime_test, dtype=torch.float32)
-photomask_test = torch.tensor(photomask_test == 0)
+photomask_test = torch.tensor(photomask_test == 1)
 photoband_test = torch.tensor(photoband_test, dtype=torch.long)
 
 
@@ -60,7 +76,7 @@ trained_vae = torch.load("../ckpt/goldstein_photospectravaesne_4-4_0.0001_200_K2
 
 # photo_only = torch.load("../ckpt/first_photovaesne_4-2_0.00025_500.pth",
 #                          map_location=torch.device('cpu'), weights_only = False)
-photo_only = torch.load("../ckpt/goldstein_photovaesne_4-4_0.00025_200.pth",
+photo_only = torch.load("../ckpt/goldstein_photovaesne_4-4_0.00025_200_dim256.pth",
                          map_location=torch.device('cpu'), weights_only = False)
 
 # spectra_only = torch.load('../ckpt/first_specvaesne_4-2_0.00025_500.pth',
@@ -191,7 +207,7 @@ plt.close()
 
 fig, axs = plt.subplots(3, 1, figsize=(10, 12))
 
-
+"""
 axs[0].plot(wavelength_test[idx] * wavelength_std + wavelength_mean, 
          flux_test[idx] * flux_std + flux_mean, 
          label='ground truth', color = "red")
@@ -230,6 +246,46 @@ axs[2].fill_between(wavelength_test[idx]* wavelength_std + wavelength_mean,
                     spectra_only_recon.quantile(dim=0, q=0.025)[0].detach().numpy() * flux_std + flux_mean, 
                     spectra_only_recon.quantile(dim=0, q=0.975)[0].detach().numpy() * flux_std + flux_mean,
                     color = "orange", alpha=0.3)
+"""
+
+# Mask for observed spectral bins
+val = (mask_test[idx] == 0).cpu().numpy()
+
+# Wavelength array (only valid bins)
+wave = (wavelength_test[idx][val].cpu().numpy() * wavelength_std + wavelength_mean)
+
+# Ground truth flux (only valid bins)
+flux_gt = (flux_test[idx][val].cpu().numpy() * flux_std + flux_mean)
+
+# --- Spec → Spec ---
+rec_mean = reconstruction[1][1].mean(axis=0)[0].detach().cpu().numpy()[val]
+rec_lo   = reconstruction[1][1].quantile(dim=0, q=0.025)[0].detach().cpu().numpy()[val]
+rec_hi   = reconstruction[1][1].quantile(dim=0, q=0.975)[0].detach().cpu().numpy()[val]
+
+axs[0].plot(wave, flux_gt, label='ground truth', color="red", lw=1.0)
+axs[0].plot(wave, rec_mean * flux_std + flux_mean, label='Rec-spec', color="blue")
+axs[0].fill_between(wave, rec_lo * flux_std + flux_mean, rec_hi * flux_std + flux_mean,
+                    color="blue", alpha=0.3)
+
+# --- LC → Spec ---
+lc_mean = reconstruction[0][1].mean(axis=0)[0].detach().cpu().numpy()[val]
+lc_lo   = reconstruction[0][1].quantile(dim=0, q=0.025)[0].detach().cpu().numpy()[val]
+lc_hi   = reconstruction[0][1].quantile(dim=0, q=0.975)[0].detach().cpu().numpy()[val]
+
+axs[1].plot(wave, flux_gt, color="red", lw=1.0)
+axs[1].plot(wave, lc_mean * flux_std + flux_mean, label='Rec-LC', color="green")
+axs[1].fill_between(wave, lc_lo * flux_std + flux_mean, lc_hi * flux_std + flux_mean,
+                    color="green", alpha=0.3)
+
+# --- Spec-only ---
+so_mean = spectra_only_recon.mean(axis=0)[0].detach().cpu().numpy()[val]
+so_lo   = spectra_only_recon.quantile(dim=0, q=0.025)[0].detach().cpu().numpy()[val]
+so_hi   = spectra_only_recon.quantile(dim=0, q=0.975)[0].detach().cpu().numpy()[val]
+
+axs[2].plot(wave, flux_gt, color="red", lw=1.0)
+axs[2].plot(wave, so_mean * flux_std + flux_mean, label='spec-only', color="orange")
+axs[2].fill_between(wave, so_lo * flux_std + flux_mean, so_hi * flux_std + flux_mean,
+                    color="orange", alpha=0.3)
 
 
 '''
@@ -449,6 +505,31 @@ for name, errs, rec_array, gt_array in [
 ]:
     worst_idx = np.argsort(errs)[-k:][::-1]
     for sn in worst_idx:
+        val = (mask_test[sn] == 0).cpu().numpy()  # observed spectral bins for this SN
+
+        x_wave  = (wavelength_test[sn][val].cpu().numpy() * wavelength_std + wavelength_mean)
+        gt_spec = (gt_array[sn] * flux_std + flux_mean)[val]
+        rec_spec= (rec_array[sn] * flux_std + flux_mean)[val]
+
+        fig, ax = plt.subplots(1,1, figsize=(6,4))
+        ax.plot(x_wave, gt_spec, '-',  label="GT Spec")
+        ax.plot(x_wave, rec_spec, '--', label="Rec Spec")
+        ax.set_xlabel("Wavelength (Å)")
+        ax.set_ylabel("log Fν")
+        ax.legend()
+        ax.set_title(f"{name} (worst idx = {sn})")
+        plt.tight_layout()
+        plt.savefig(f"figures/worst_{name.replace(' → ','_to_')}_idx{sn}.png")
+        plt.show()
+        plt.close()
+
+"""
+for name, errs, rec_array, gt_array in [
+    ("Spec → Spec", err_spec2spec, rec_spec2spec, flux_np),
+    ("LC → Spec",   err_lc2spec,   rec_lc2spec,   flux_np),
+]:
+    worst_idx = np.argsort(errs)[-k:][::-1]
+    for sn in worst_idx:
         # de-normalize
         x_wave = wavelength_test[sn].cpu().numpy() * wavelength_std + wavelength_mean
         gt_spec = gt_array[sn] * flux_std + flux_mean
@@ -464,3 +545,4 @@ for name, errs, rec_array, gt_array in [
         plt.savefig(f"figures/worst_{name.replace(' → ','_to_')}_idx{sn}.png")
         plt.show()
         plt.close()
+"""

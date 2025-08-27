@@ -2,7 +2,7 @@ import torch
 import torch.nn.init as init
 from torch import nn
 from torch.nn import functional as F
-from .SpectraLayers import spectraTransformerDecoder, spectraTransformerEncoder
+from .SpectraLayers import spectraTransformerDecoder, spectraTransformerEncoder, spectraTransformerDecoder2stages
 
 from .base_vae import VAE
 import torch.distributions as dist
@@ -58,11 +58,26 @@ class SpectraDec(nn.Module):
                  ff_dim, 
                  num_layers,
                  dropout=0.1,
-                 selfattn = False):
+                 selfattn = False,
+                 twostages_decoding = False,
+                 hidden_len = None,
+                 ):
         super(SpectraDec, self).__init__()
-
-        # p(x|z)
-        self.generativetransformer = spectraTransformerDecoder(
+        if twostages_decoding:
+            self.generativetransformer = spectraTransformerDecoder2stages(
+                
+                 latent_dim,
+                 hidden_len,
+                 model_dim, 
+                 num_heads, 
+                 ff_dim, 
+                 num_layers,
+                 dropout,
+                 selfattn
+                 )
+        else:
+            
+            self.generativetransformer = spectraTransformerDecoder(
                 
                  latent_dim,
                  model_dim, 
@@ -101,7 +116,10 @@ class SpectraVAE(VAE):
                 beta = 1.,
                 prior = dist.Laplace,
                 likelihood = dist.Laplace,
-                posterior = dist.Laplace):
+                posterior = dist.Laplace,
+                twostages_decoding = False,
+                hidden_len = None,
+                ):
         super(SpectraVAE, self).__init__(
             prior,  # prior
             likelihood,  # likelihood
@@ -122,7 +140,10 @@ class SpectraVAE(VAE):
                     num_heads, 
                     ff_dim, 
                     num_layers,
-                    dropout),
+                    dropout,
+                    twostages_decoding = twostages_decoding,
+                    hidden_len = hidden_len
+                    ),
             params = [
                     
                     latent_len,
@@ -132,7 +153,9 @@ class SpectraVAE(VAE):
                     num_layers,
                     ff_dim, 
                     dropout,
-                    selfattn
+                    selfattn,
+                    twostages_decoding,
+                    hidden_len
                     ]
         )
         self._pz_params = nn.ParameterList([

@@ -62,6 +62,76 @@ class spectraTransformerDecoder(nn.Module):
             h = transformerblock(h, bottleneck, mask=mask)
         return self.get_flux(x + h).squeeze(-1) # residual connection
 
+
+
+class spectraTransformerDecoder2stages(nn.Module):
+    def __init__(self, 
+                 bottleneck_dim,
+                 hidden_len = None,
+                 model_dim = 32, 
+                 num_heads = 4, 
+                 ff_dim = 32, 
+                 num_layers = 4,
+                 dropout=0.1, 
+                 selfattn=False
+                 ):
+        '''
+        A transformer to decode something (latent) into spectra given time and band
+        Args:
+            
+            bottleneck_dim: dimension of the thing you want to decode, should be a tensor [batch_size, bottleneck_length, bottleneck_dim]
+            num_bands: number of bands, currently embedded as class
+            model_dim: dimension the transformer should operate 
+            num_heads: number of heads in the multiheaded attention
+            ff_dim: dimension of the MLP hidden layer in transformer
+            num_layers: number of transformer blocks
+            dropout: drop out in transformer
+            selfattn: if we want self attention to the latent
+        '''
+        super(spectraTransformerDecoder2stages, self).__init__()
+        if hidden_len is None:
+            hidden_len = 128
+        
+        self.init_hidden = nn.Parameter(torch.randn(1, hidden_len, model_dim) * 0.02)
+        
+        self.transformerblocks_bottleneck_to_hidden = nn.ModuleList( [TransformerBlock(model_dim, 
+                                                 num_heads, ff_dim, dropout, selfattn, False) 
+                                                    for _ in range(num_layers)] 
+                                                )
+        self.transformerblocks_hidden_to_out = nn.ModuleList( [TransformerBlock(model_dim, 
+                                                 num_heads, ff_dim, dropout, False, True) 
+                                                    for _ in range(num_layers)] 
+                                                )
+        self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)
+        self.phase_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)
+        self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim]) # expand bottleneck to flux and time
+        #self.get_photo = singlelayerMLP(model_dim, 1) # expand bottleneck to flux and wavelength
+        self.get_flux = singlelayerMLP(model_dim, 1)
+    
+    def forward(self, wavelength, phase, bottleneck, mask=None):
+        '''
+        Args:
+            wavelength: wavelength of the spectra being taken [batch_size, spectra_length]
+            phase: phase of the spectra being taken [batch_size, 1]
+            bottleneck: bottleneck from the encoder [batch_size, bottleneck_length, bottleneck_dim]
+        Return:
+            Decoded spectra of shape [batch_size, spectra_length]
+        '''
+        wavelength_embd = self.wavelength_embd_layer(wavelength)
+        phase_embd = self.phase_embd_layer(phase[:, None])
+        x =  wavelength_embd #+ phase_embd
+        h = x
+        hidden = self.init_hidden.repeat(bottleneck.shape[0],1,1)
+        bottleneck = self.contextfc(bottleneck)
+        bottleneck = torch.concat([bottleneck, phase_embd], dim=1)
+        for transformerblock1, transformerblock2 in zip(self.transformerblocks_bottleneck_to_hidden, self.transformerblocks_hidden_to_out):
+            hidden = transformerblock1(hidden, bottleneck)
+            h = transformerblock2(x, hidden, mask = mask)
+        return self.get_flux(x + h).squeeze(-1) # residual connection
+
+
+
+
 # this will generate bottleneck, in encoder
 class spectraTransformerEncoder(nn.Module):
     def __init__(self, bottleneck_length,
